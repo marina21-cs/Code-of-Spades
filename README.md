@@ -196,7 +196,7 @@ npx expo run:ios
 
 ---
 
-## 📊 Progress Map & Timeline
+## 📊 Progress Map
 
 > **Overall Progress: `█░░░░░░░░░░░░░░░░░░░` 1%**
 
@@ -215,26 +215,6 @@ npx expo run:ios
 | ♿ Accessibility Features | 🔲 Not Started | ░░░░░░░░░░ 0% | OpenDyslexic, high contrast, TTS |
 | 🦊 Suri Mascot Animation | 🔲 Not Started | ░░░░░░░░░░ 0% | Idle & thinking states |
 | 🧪 Testing & QA | 🔲 Not Started | ░░░░░░░░░░ 0% | Offline fallback, provider cascade |
-
-### Development Timeline
-
-```
-Week 1 (Current)
-├── ✅ Day 1-2: Project planning & documentation
-├── 🔲 Day 3-4: Expo project init, navigation shell
-└── 🔲 Day 5-7: Hybrid AI router + Cloud AI streaming
-
-Week 2
-├── 🔲 Day 8-9:  On-device SLM (llama.rn) integration
-├── 🔲 Day 10-11: Local RAG with DepEd MELCs
-└── 🔲 Day 12-14: Learning profile quiz + adaptive responses
-
-Week 3
-├── 🔲 Day 15-16: SVG visual generation
-├── 🔲 Day 17-18: Accessibility (font, contrast, TTS)
-├── 🔲 Day 19-20: Suri mascot animations
-└── 🔲 Day 21: Testing, polish, demo prep
-```
 
 ### Legend
 
