@@ -1,0 +1,39 @@
+{
+  "name": "suri",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
+    "verify:schema": "node scripts/verify-schema.mjs",
+    "verify:profile": "node --import ./scripts/register-ts.mjs scripts/verify-profile.mjs",
+    "verify:rag": "node --import ./scripts/register-ts.mjs scripts/verify-rag.mjs",
+    "verify:router": "node --import ./scripts/register-ts.mjs scripts/verify-router.mjs",
+    "verify:slm": "node --import ./scripts/register-ts.mjs scripts/verify-slm.mjs",
+    "verify:services": "node --import ./scripts/register-ts.mjs scripts/verify-services.mjs"
+  },
+  "dependencies": {
+    "@react-native-community/netinfo": "~11.4.0",
+    "expo": "~54.0.0",
+    "expo-file-system": "~19.0.0",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-speech": "~14.0.0",
+    "expo-speech-recognition": "~2.1.0",
+    "expo-sqlite": "~16.0.0",
+    "expo-status-bar": "~3.0.0",
+    "expo-av": "~16.0.0",
+    "llama.rn": "0.12.5",
+    "react": "19.1.0",
+    "react-native": "0.81.0",
+    "react-native-safe-area-context": "~5.4.0",
+    "react-native-screens": "~4.11.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.8.0"
+  },
+  "private": true
+}
