@@ -13,12 +13,13 @@
 [![React Native](https://img.shields.io/badge/React%20Native-0.74-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactnative.dev)
 [![llama.rn](https://img.shields.io/badge/On--Device%20AI-llama.rn-ff6b35?style=for-the-badge)](https://github.com/mybigday/llama.rn)
 [![DepEd Aligned](https://img.shields.io/badge/Curriculum-DepEd%20MELCs-0038a8?style=for-the-badge)](https://www.deped.gov.ph)
-[![License MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
 
 <br/>
 
-> **ACM TechSprint × Accenture — Mobile App Edition**
-> Addressing the dual barriers of **poor internet connectivity** and **lack of inclusive learning support** for students across the Philippines.
+> **ACM TechSprint × Accenture**
+> Many Filipino students face barriers to quality educational support due to limited access to tutors, connectivity constraints, and language differences. Existing learning platforms often fail to accommodate diverse learning needs, particularly for students who prefer learning in Filipino or require personalized guidance aligned with their grade level.
+> 
+> Your challenge is to develop an AI-powered study companion that provides accessible and personalized academic assistance for Filipino learners. The solution should be capable of explaining concepts in both Filipino and English, generating practice exercises, and adapting to a student's learning level. Teams are encouraged to design solutions optimized for mobile devices and low-bandwidth environments to ensure that quality educational support is accessible to learners regardless of their location or circumstances.
 
 <br/>
 
@@ -252,10 +253,6 @@ Suri was proudly built by:
 * **Ma. Ellery Brienne B. Santiago**
 
 ---
-
-## License
-
-[MIT](LICENSE) — built with 💙 for Filipino learners.
 
 ---
 
