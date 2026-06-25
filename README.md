@@ -196,17 +196,79 @@ npx expo run:ios
 
 ---
 
+## 📊 Progress Map & Timeline
+
+> **Overall Progress: `█░░░░░░░░░░░░░░░░░░░` 1%**
+
+### Current Sprint Status
+
+| Component | Status | Progress | Notes |
+|---|---|---|---|
+| 📄 Project Documentation | ✅ Done | █████████░ 100% | README, specs, project structure |
+| 🏗 App Shell & Navigation | 🔲 Not Started | ░░░░░░░░░░ 0% | Expo init, tab navigation, routing |
+| 🧠 Hybrid AI Router | 🔲 Not Started | ░░░░░░░░░░ 0% | Net detection, tier switching logic |
+| ☁️ Cloud AI Integration | 🔲 Not Started | ░░░░░░░░░░ 0% | Gemini / Groq / DeepSeek streaming |
+| 📱 On-Device SLM | 🔲 Not Started | ░░░░░░░░░░ 0% | llama.rn setup, model loading |
+| 📚 Local RAG (DepEd MELCs) | 🔲 Not Started | ░░░░░░░░░░ 0% | SQLite vector store, MELC data |
+| 🎨 Learning Profile Quiz | 🔲 Not Started | ░░░░░░░░░░ 0% | Onboarding flow, profile storage |
+| 🖼 Visual Generation (SVG) | 🔲 Not Started | ░░░░░░░░░░ 0% | LLM JSON → SVG diagrams |
+| ♿ Accessibility Features | 🔲 Not Started | ░░░░░░░░░░ 0% | OpenDyslexic, high contrast, TTS |
+| 🦊 Suri Mascot Animation | 🔲 Not Started | ░░░░░░░░░░ 0% | Idle & thinking states |
+| 🧪 Testing & QA | 🔲 Not Started | ░░░░░░░░░░ 0% | Offline fallback, provider cascade |
+
+### Development Timeline
+
+```
+Week 1 (Current)
+├── ✅ Day 1-2: Project planning & documentation
+├── 🔲 Day 3-4: Expo project init, navigation shell
+└── 🔲 Day 5-7: Hybrid AI router + Cloud AI streaming
+
+Week 2
+├── 🔲 Day 8-9:  On-device SLM (llama.rn) integration
+├── 🔲 Day 10-11: Local RAG with DepEd MELCs
+└── 🔲 Day 12-14: Learning profile quiz + adaptive responses
+
+Week 3
+├── 🔲 Day 15-16: SVG visual generation
+├── 🔲 Day 17-18: Accessibility (font, contrast, TTS)
+├── 🔲 Day 19-20: Suri mascot animations
+└── 🔲 Day 21: Testing, polish, demo prep
+```
+
+### Legend
+
+| Symbol | Meaning |
+|---|---|
+| ✅ | Completed |
+| 🟡 | In Progress |
+| 🔲 | Not Started |
+| 🚫 | Blocked |
+
+---
+
 ## AI Disclosure
 
 *The initial repository structure and documentation for this project were assisted by AI tools.*
 
-Suri itself is an AI-powered application. Its Hybrid AI Engine routes queries across cloud models and an on-device SLM — see [Architecture](#architecture) for full details.
+Core AI Functionality in Suri: Suri itself is an AI-powered application that utilizes a robust Hybrid AI Engine with a 3-tier routing architecture:
+
+Tier 1 (Strong Signal): Cloud models via Gemini 3 Flash (Primary), Groq llama-3.1-8b-instant, and OpenRouter DeepSeek V3.
+Tier 2 (Weak Signal): Reduced payload querying for low-bandwidth environments.
+Tier 3 (Offline/No Signal): On-device small language model (SLM) using llama.rn running SmolLM2-135M-Instruct Q4_K_M locally.
 
 ---
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
+# 👥 The Team
+
+Suri was proudly built by:
+
+* **Lorenz Gabriel Velasco**
+* **Eunice Angeline Y. Cruz**
+* **Ardiel Drew L. Cristobal**
+* **Ma. Ellery Brienne B. Santiago**
 
 ---
 
