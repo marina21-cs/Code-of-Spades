@@ -198,13 +198,14 @@ npx expo run:ios
 
 ## 📊 Progress Map
 
-> **Overall Progress: `█░░░░░░░░░░░░░░░░░░░` 1%**
+> **Overall Progress: `█░░░░░░░░░░░░░░░░░░░` 5%**
 
 ### Current Sprint Status
 
 | Component | Status | Progress | Notes |
 |---|---|---|---|
-| 📄 Project Documentation | ✅ Done | █████████░ 100% | README, specs, project structure |
+| 🗄️ Repository Setup | ✅ Done | ██████████ 100% | Git init, remote config, initial push |
+| 📄 Project Documentation | ✅ Done | ██████████ 100% | README, specs, project structure |
 | 🏗 App Shell & Navigation | 🔲 Not Started | ░░░░░░░░░░ 0% | Expo init, tab navigation, routing |
 | 🧠 Hybrid AI Router | 🔲 Not Started | ░░░░░░░░░░ 0% | Net detection, tier switching logic |
 | ☁️ Cloud AI Integration | 🔲 Not Started | ░░░░░░░░░░ 0% | Gemini / Groq / DeepSeek streaming |
