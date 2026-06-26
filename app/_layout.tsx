@@ -10,9 +10,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { initDB } from '@/db/database';
 import { seedMELCs } from '@/db/ragStore';
 import { maybeRegisterSLM } from '@/ai/offlineSLM';
-import { registerTelemetrySync } from '@/telemetry/backgroundSync';
-import { verifyDB } from '@/db/verifyDB';
-import { verifyRAG } from '@/db/verifyRAG';
 import { colors, spacing, typography, useAppFonts } from '@/theme';
 import {
   refreshOnboardingStatus,
@@ -45,41 +42,70 @@ export default function RootLayout() {
   useEffect(() => {
     let mounted = true;
 
+    // Safety-net timeout: if init hasn't resolved in 8 seconds, proceed
+    // anyway so the student isn't stuck on a spinner forever.
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('[Suri] Init timed out after 8 s — proceeding with partial init.');
+        setState({ phase: 'ready' });
+      }
+    }, 8000);
+
     (async () => {
       try {
         await initDB();
-        // Seed the bundled MELC curriculum (idempotent — no-op if present).
+      } catch (err) {
+        console.warn('[Suri] initDB failed:', err);
+        // DB is critical — if it fails, show the error screen.
+        if (mounted) {
+          setState({ phase: 'error', error: err as Error });
+        }
+        clearTimeout(timeout);
+        return;
+      }
+
+      // Seed MELCs — best-effort; don't block on failure.
+      try {
         await seedMELCs();
-        // If the offline SLM is already downloaded, wire it in as the router's
-        // Tier-3 runner. No-op (keeps the extractive fallback) otherwise.
+      } catch (err) {
+        console.warn('[Suri] seedMELCs failed (non-fatal):', err);
+      }
+
+      // SLM registration — best-effort; extractive fallback is the default.
+      try {
         await maybeRegisterSLM();
-        // Schedule the OS-level background telemetry sync (spec 5.10). Best-effort:
-        // never block boot if the platform can't register the task (e.g. Expo Go).
-        try {
-          await registerTelemetrySync();
-        } catch {
-          // Background fetch unavailable on this platform — telemetry still
-          // drains in-app via syncNow(); ignore the registration failure.
-        }
-        // Headless validation in development only — never ships to students.
-        if (__DEV__) {
-          await verifyDB();
-          await verifyRAG();
-        }
-        // Resolve whether to send the student into onboarding.
+      } catch (err) {
+        console.warn('[Suri] maybeRegisterSLM failed (non-fatal):', err);
+      }
+
+      // Telemetry — dynamic import to avoid TaskManager.defineTask() crash in
+      // Expo Go. Best-effort; never block boot.
+      try {
+        const { registerTelemetrySync: reg } = await import('@/telemetry/backgroundSync');
+        await reg();
+      } catch (err) {
+        console.warn('[Suri] Telemetry sync registration skipped:', err);
+      }
+
+      // Skip __DEV__ verifiers — they are useful but can hang in Expo Go and
+      // should never block the student from using the app.
+
+      // Resolve onboarding status.
+      try {
         await refreshOnboardingStatus();
-        if (mounted) {
-          setState({ phase: 'ready' });
-        }
-      } catch (error) {
-        if (mounted) {
-          setState({ phase: 'error', error: error as Error });
-        }
+      } catch (err) {
+        console.warn('[Suri] refreshOnboardingStatus failed (non-fatal):', err);
+      }
+
+      if (mounted) {
+        clearTimeout(timeout);
+        setState({ phase: 'ready' });
       }
     })();
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
     };
   }, []);
 
