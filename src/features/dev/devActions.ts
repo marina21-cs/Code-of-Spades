@@ -19,7 +19,7 @@ import { todayISO } from '@/gamification/streakLogic';
 import { unlockStreakBadges } from '@/gamification/streakService';
 import { refreshOnboardingStatus } from '@/profile/onboardingState';
 import { resetProfile } from '@/profile/profileStore';
-import * as SecureStore from 'expo-secure-store';
+import { storageDeleteItem } from '@/profile/secureStorage';
 
 /** Secure-store key for the first-run completion flag (mirrors profileStore). */
 const FIRST_RUN_DONE_KEY = 'suri.first_run_complete';
@@ -36,7 +36,7 @@ function messageOf(err: unknown): string {
  */
 export async function resetOnboarding(): Promise<string> {
   try {
-    await SecureStore.deleteItemAsync(FIRST_RUN_DONE_KEY);
+    await storageDeleteItem(FIRST_RUN_DONE_KEY);
     await refreshOnboardingStatus();
     return 'Onboarding flag cleared';
   } catch (err) {

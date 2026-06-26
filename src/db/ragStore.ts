@@ -254,6 +254,8 @@ export interface ReviewerItem {
   subject: string | null;
   gradeLevel: number | null;
   preview: string;
+  /** Full reviewer text (for the detail view). */
+  content: string;
   competencyCode: string | null;
 }
 
@@ -288,6 +290,7 @@ export async function getReviewerItems(gradeLevel?: number): Promise<ReviewerIte
     subject: row.subject,
     gradeLevel: row.grade_level,
     preview: preview(row.content),
+    content: row.content,
     competencyCode: row.competency_code,
   }));
 
@@ -298,6 +301,7 @@ export async function getReviewerItems(gradeLevel?: number): Promise<ReviewerIte
     subject: row.subject,
     gradeLevel: row.grade_level,
     preview: preview(row.content),
+    content: row.content,
     competencyCode: null,
   }));
 

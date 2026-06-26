@@ -31,7 +31,7 @@ export const PALETTE = {
 } as const;
 
 /** Semantic, role-based tokens (consumed by screens). Matched to zip(4). */
-export const colors = {
+const BASE_COLORS = {
   // Surfaces (cream base + Material container ramp).
   background: '#fff8f5',
   surface: '#ffffff', // surface-container-lowest (cards, bubbles)
@@ -67,14 +67,22 @@ export const colors = {
   transparent: 'transparent',
 } as const;
 
-export type ThemeColors = Record<keyof typeof colors, string>;
+export type ThemeColors = Record<keyof typeof BASE_COLORS, string>;
+
+/**
+ * The LIVE semantic palette every screen imports as `colors`. It starts as the
+ * standard warm theme and is MUTATED IN PLACE by applyAccessibleColors() the
+ * moment the student changes High Contrast or Color Vision, so the existing
+ * `import { colors } from '@/theme'` call sites recolor on their next render
+ * (driven by the shared profile store) without each screen adopting a hook.
+ */
+export const colors: ThemeColors = { ...BASE_COLORS };
 
 /**
  * High-contrast overrides (spec 5.6) for the LIGHT theme: pure black text on
  * white, heavier borders. The terracotta accent is kept for recognizable CTAs.
  */
-export const highContrastColors: ThemeColors = {
-  ...colors,
+const HIGH_CONTRAST_OVERRIDES: Partial<ThemeColors> = {
   background: '#ffffff',
   surface: '#ffffff',
   surfaceAlt: '#f2f2f2',
@@ -86,9 +94,89 @@ export const highContrastColors: ThemeColors = {
   borderStrong: '#000000',
 };
 
-/** Resolve the active color set for the current accessibility settings. */
-export function getThemeColors(options: { highContrast?: boolean } = {}): ThemeColors {
-  return options.highContrast ? highContrastColors : colors;
+/**
+ * Color-vision overrides (spec 5.6). Picking a mode swaps the brand ACCENT and
+ * STATUS hues (not the neutral surfaces/text) for a colorblind-distinguishable
+ * set derived from the Okabe-Ito palette, so the whole UI — buttons, icons,
+ * headers, active chips, status cards — visibly recolors when the mode changes.
+ *
+ * Principle per condition:
+ *   deuteranopia / protanopia (red-green): lead with BLUE + ORANGE, never red vs green.
+ *   tritanopia (blue-yellow): lead with VERMILION + GREEN, avoid blue vs yellow.
+ * 'standard' keeps the warm terracotta brand theme unchanged.
+ */
+const COLOR_VISION_THEME_OVERRIDES: Record<ColorVisionMode, Partial<ThemeColors>> = {
+  standard: {},
+  deuteranopia: {
+    accentPrimary: '#0072B2',
+    accentSecondary: '#E69F00',
+    accentPrimaryDim: 'rgba(0, 114, 178, 0.14)',
+    accentSecondaryDim: 'rgba(230, 159, 0, 0.14)',
+    success: '#009E73',
+    info: '#56B4E9',
+    warning: '#E69F00',
+    danger: '#D55E00',
+    borderNeon: '#0072B2',
+    borderNeonAlt: '#E69F00',
+  },
+  protanopia: {
+    accentPrimary: '#0072B2',
+    accentSecondary: '#E69F00',
+    accentPrimaryDim: 'rgba(0, 114, 178, 0.14)',
+    accentSecondaryDim: 'rgba(230, 159, 0, 0.14)',
+    success: '#009E73',
+    info: '#56B4E9',
+    warning: '#E69F00',
+    danger: '#CC79A7',
+    borderNeon: '#0072B2',
+    borderNeonAlt: '#E69F00',
+  },
+  tritanopia: {
+    accentPrimary: '#D55E00',
+    accentSecondary: '#009E73',
+    accentPrimaryDim: 'rgba(213, 94, 0, 0.14)',
+    accentSecondaryDim: 'rgba(0, 158, 115, 0.14)',
+    success: '#009E73',
+    info: '#CC79A7',
+    warning: '#D55E00',
+    danger: '#C40233',
+    borderNeon: '#D55E00',
+    borderNeonAlt: '#009E73',
+  },
+};
+
+/**
+ * Resolve the active color set for the given accessibility settings. High
+ * Contrast swaps the neutrals; Color Vision swaps the accent/status hues. Both
+ * can apply at once (contrast first, then the colorblind-safe accents).
+ */
+export function getThemeColors(
+  options: { highContrast?: boolean; colorVision?: ColorVisionMode } = {},
+): ThemeColors {
+  const { highContrast = false, colorVision = 'standard' } = options;
+  return {
+    ...BASE_COLORS,
+    ...(highContrast ? HIGH_CONTRAST_OVERRIDES : {}),
+    ...(COLOR_VISION_THEME_OVERRIDES[colorVision] ?? {}),
+  };
+}
+
+/** Back-compat: the static high-contrast palette (standard color vision). */
+export const highContrastColors: ThemeColors = getThemeColors({ highContrast: true });
+
+/**
+ * Mutate the LIVE `colors` object in place so it matches the student's current
+ * accessibility settings. Called by the profile runtime on every change (and on
+ * first load), so every `import { colors }` consumer recolors on its next render.
+ */
+export function applyAccessibleColors(settings: {
+  highContrast?: boolean;
+  colorVision?: ColorVisionMode;
+}): void {
+  Object.assign(
+    colors,
+    getThemeColors({ highContrast: settings.highContrast, colorVision: settings.colorVision }),
+  );
 }
 
 /**

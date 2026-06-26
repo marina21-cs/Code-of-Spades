@@ -38,11 +38,38 @@ function getSnapshot(): OnboardingStatus {
   return status;
 }
 
-/** Read first-run status from secure storage and publish it. Call once at boot. */
+/**
+ * Read first-run status from secure storage and publish it. Call once at boot.
+ *
+ * Resilient by design: the root layout keeps the loading spinner up while the
+ * status is still 'unknown', so a thrown read (e.g. expo-secure-store
+ * unavailable) must NEVER leave the status unresolved — that would strand the
+ * student on the spinner forever. On any failure we default to 'first-run'
+ * (safest: a fresh student is guided through onboarding) and still emit.
+ */
 export async function refreshOnboardingStatus(): Promise<OnboardingStatus> {
-  const first = await isFirstRun();
-  status = first ? 'first-run' : 'returning';
+  try {
+    const first = await isFirstRun();
+    status = first ? 'first-run' : 'returning';
+  } catch (err) {
+    console.warn('[Suri] isFirstRun() failed; defaulting to first-run:', err);
+    status = 'first-run';
+  }
   emit();
+  return status;
+}
+
+/**
+ * Boot safety-net. Forces the status out of 'unknown' if boot stalled before
+ * refreshOnboardingStatus() could resolve it (e.g. an earlier init step hung).
+ * Idempotent: a no-op once the status is already resolved. The root layout's
+ * init-timeout calls this so the loading gate can always clear.
+ */
+export function resolveOnboardingFallback(): OnboardingStatus {
+  if (status === 'unknown') {
+    status = 'first-run';
+    emit();
+  }
   return status;
 }
 

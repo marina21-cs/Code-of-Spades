@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +25,8 @@ import { ThemedText } from '@/components/ui';
 import { useStreaks } from '@/gamification/useStreaks';
 import { useProfile } from '@/profile/useProfile';
 import { PALETTE, colors, radii, spacing, typography } from '@/theme';
+import { VisualRenderer } from '@/visuals/VisualRenderer';
+import { parseVisualSpec } from '@/visuals/visualParser';
 import { useTTS } from '@/voice/useTTS';
 
 /**
@@ -68,11 +71,19 @@ function formatTime(date: Date): string {
  */
 const TAB_BAR_CLEARANCE = 90;
 
+/** Remove the fenced ```json visual-spec block from the prose shown in a bubble. */
+function stripVisualBlock(text: string): string {
+  return text.replace(/```json\s*[\s\S]*?```/gi, '').trim();
+}
+
 export default function TanongScreen() {
   const { profile } = useProfile();
   const { streak } = useStreaks();
   const { speak, stop, isSpeaking } = useTTS();
   const net = useNetworkStatus();
+  const { width: screenWidth } = useWindowDimensions();
+  // Width for any AI-rendered chart, aligned under the assistant bubble.
+  const chartWidth = Math.max(220, Math.min(300, screenWidth - 96));
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -276,16 +287,31 @@ export default function TanongScreen() {
                   </ThemedText>
                 </View>
 
-                <View style={styles.assistantBubble}>
-                  <View style={styles.accentBar} />
-                  <ThemedText
-                    variant="body"
-                    color={colors.textPrimary}
-                    style={styles.assistantText}
-                  >
-                    {message.text || (isSending ? '...' : '')}
-                  </ThemedText>
-                </View>
+                {(() => {
+                  // Render any AI diagram spec (spec 5.4) below the prose; it
+                  // auto-applies the student's color-vision palette (spec 5.6).
+                  const spec = message.text ? parseVisualSpec(message.text) : null;
+                  const prose = spec ? stripVisualBlock(message.text) : message.text;
+                  return (
+                    <>
+                      <View style={styles.assistantBubble}>
+                        <View style={styles.accentBar} />
+                        <ThemedText
+                          variant="body"
+                          color={colors.textPrimary}
+                          style={styles.assistantText}
+                        >
+                          {prose || (isSending ? '...' : '')}
+                        </ThemedText>
+                      </View>
+                      {spec ? (
+                        <View style={styles.chartWrap}>
+                          <VisualRenderer spec={spec} width={chartWidth} height={200} />
+                        </View>
+                      ) : null}
+                    </>
+                  );
+                })()}
 
                 {message.text.trim().length > 0 ? (
                   <View style={styles.listenRow}>
@@ -635,6 +661,11 @@ const styles = StyleSheet.create({
   assistantText: {
     paddingLeft: spacing.sm,
     lineHeight: 22,
+  },
+  chartWrap: {
+    marginLeft: 42,
+    marginTop: spacing.sm,
+    alignItems: 'flex-start',
   },
   listenRow: {
     marginLeft: 42,

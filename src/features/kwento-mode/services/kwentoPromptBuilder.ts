@@ -22,10 +22,49 @@ import type {
   KwentoCulturalSetting,
   KwentoModeRequest,
 } from '../types/kwento.types';
+import type { ResponseMode } from '@/profile/types';
 
 export interface BuiltPrompt {
   systemPrompt: string;
   userPrompt: string;
+}
+
+/**
+ * Explanation-style directive driven by the student's "Paraan ng Pagpapaliwanag"
+ * (responseMode, spec 5.6). This is what makes the SAME kwento explain its hint
+ * and step-by-step solution differently for a visual vs auditory vs reading vs
+ * kinesthetic learner — wiring the profile's learning style into Kwento Mode,
+ * not just the chat tab.
+ */
+const EXPLANATION_STYLE: Record<ResponseMode, string> = {
+  visual: [
+    'EXPLANATION STYLE (visual learner):',
+    '- In "suliranin_sagot", put each step on its own line and describe quantities in a way the student can picture (groups, parts of a whole, a simple before/after).',
+    '- In "hint", point to something concrete in the story they can visualize.',
+  ].join('\n'),
+  auditory: [
+    'EXPLANATION STYLE (auditory learner):',
+    '- Write "hint" and "suliranin_sagot" as full, flowing sentences that read naturally when spoken aloud.',
+    '- Avoid bare symbols and bullet fragments; spell steps out in words (e.g. "multiply three by forty-five").',
+  ].join('\n'),
+  reading: [
+    'EXPLANATION STYLE (reading/writing learner):',
+    '- In "suliranin_sagot", use short numbered steps with one idea each, then end with a one-line summary the student can copy into their notes.',
+  ].join('\n'),
+  kinesthetic: [
+    'EXPLANATION STYLE (kinesthetic learner):',
+    '- In "hint", invite the student to DO something first (count, draw, or group objects) before "suliranin_sagot" reveals the full steps.',
+  ].join('\n'),
+  mixed: [
+    'EXPLANATION STYLE (mixed):',
+    '- Keep "suliranin_sagot" as clear, concrete numbered steps with a brief recap at the end.',
+  ].join('\n'),
+};
+
+/** Resolve the explanation-style block from the request's learning profile. */
+function explanationStyleBlock(profile: KwentoModeRequest['learningProfile']): string {
+  const mode: ResponseMode = profile?.responseMode ?? 'mixed';
+  return EXPLANATION_STYLE[mode] ?? EXPLANATION_STYLE.mixed;
 }
 
 /**
@@ -121,7 +160,7 @@ export function buildKwentoPrompt(request: KwentoModeRequest): BuiltPrompt {
     setting,
     settingData,
     request.languagePreference,
-  )}`;
+  )}\n\n---\n\n${explanationStyleBlock(request.learningProfile)}`;
 
   const previous = request.previousKwentoIds?.length
     ? `\n\nAvoid reusing settings/characters from these recent kwentos: ${request.previousKwentoIds.join(', ')}`

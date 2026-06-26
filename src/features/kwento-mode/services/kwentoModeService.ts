@@ -27,6 +27,7 @@ import type {
   KwentoTierId,
 } from '../types/kwento.types';
 import { saveKwento } from './kwentoCache';
+import { buildLocalKwento } from './kwentoFallbackContent';
 import { buildKwentoOfflinePrompt, buildKwentoPrompt } from './kwentoPromptBuilder';
 import { parseKwentoResponse } from './kwentoParser';
 
@@ -89,7 +90,18 @@ export async function generateKwento(
     signal: callbacks.signal,
   });
 
-  const kwento = parseKwentoResponse(result.text, enrichedRequest, tierIdForTier(result.tier));
+  const tierId = tierIdForTier(result.tier);
+  let kwento = parseKwentoResponse(result.text, enrichedRequest, tierId);
+
+  // When the model could not be reached (cloud cascade exhausted, or offline with
+  // no on-device SLM), generateWithPrompt returns plain prose instead of JSON, so
+  // the parser degrades to a fallback with an EMPTY solution. An empty
+  // `suliranin_sagot` is the reliable signal for that (a valid parse always has a
+  // non-empty one). In that case serve a complete, curriculum-grounded local
+  // kwento so the student still gets a real, solvable story — not an empty shell.
+  if (kwento.suliranin_sagot.trim().length === 0) {
+    kwento = buildLocalKwento(enrichedRequest, tierId);
+  }
 
   // Cache for offline reuse / session continuity — never fail generation on a
   // cache write error.

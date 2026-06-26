@@ -47,6 +47,8 @@ interface ActiveQuiz {
   category: string;
   /** Embeds the prototype's <br/> as a newline. */
   title: string;
+  /** Clean topic string passed to the quiz generator. */
+  topic: string;
   icon: IconName;
   answered: number;
   total: number;
@@ -68,6 +70,7 @@ interface PastResult {
 const ACTIVE_QUIZ: ActiveQuiz = {
   category: 'Agham',
   title: 'Science:\nPhotosynthesis',
+  topic: 'Photosynthesis',
   icon: 'leaf',
   answered: 2,
   total: 10,
@@ -118,9 +121,9 @@ export default function QuizzesScreen() {
   // <TopBar onSettings> -> open the Profile tab (settings live there).
   const openSettings = () => router.push(PROFILE_ROUTE);
 
-  // <div onClick={() => navigate('quizQuestion')}> — route not built yet.
-  const handleQuizPress = () => {
-    /* no-op: QuizQuestion route + quiz engine are a follow-up. */
+  // Start a freshly generated quiz on the given topic (AI + RAG, language-aware).
+  const startQuiz = (topic: string) => {
+    router.push(`/quiz?topic=${encodeURIComponent(topic)}` as Href);
   };
 
   const progressWidth = `${ACTIVE_QUIZ.progress}%` as DimensionValue;
@@ -172,7 +175,7 @@ export default function QuizzesScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Ipagpatuloy ang ${ACTIVE_QUIZ.category} quiz`}
-            onPress={handleQuizPress}
+            onPress={() => startQuiz(ACTIVE_QUIZ.topic)}
             style={({ pressed }) => [styles.activeCard, styles.shadowSm, pressed && styles.pressed]}
           >
             {/* Top row: category + title | subject icon */}
@@ -212,11 +215,11 @@ export default function QuizzesScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Ipagpatuloy"
-                onPress={handleQuizPress}
+                onPress={() => startQuiz(ACTIVE_QUIZ.topic)}
                 style={({ pressed }) => [styles.continueButton, styles.shadowMd, pressed && styles.pressed]}
               >
                 <ThemedText variant="button" color={colors.textOnAccent}>
-                  Ipagpatuloy
+                  Simulan ang Pagsusulit
                 </ThemedText>
               </Pressable>
             </View>
@@ -234,7 +237,7 @@ export default function QuizzesScreen() {
                 key={result.id}
                 accessibilityRole="button"
                 accessibilityLabel={`${result.subject}: ${result.score}%`}
-                onPress={handleQuizPress}
+                onPress={() => startQuiz(result.topic)}
                 style={({ pressed }) => [styles.resultCard, styles.shadowSm, pressed && styles.pressed]}
               >
                 <View
@@ -267,8 +270,8 @@ export default function QuizzesScreen() {
         <View style={styles.statusNote}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
           <ThemedText variant="caption" color={colors.textMuted} style={styles.statusText}>
-            Grade {profile.gradeLevel} • Ang quiz logic at QuizQuestion route ay paparating pa
-            (follow-up).
+            Grade {profile.gradeLevel} • Bubuo si Suri ng bagong pagsusulit mula sa iyong
+            kurikulum (MELC). Pindutin ang anumang paksa para magsimula.
           </ThemedText>
         </View>
       </ScrollView>

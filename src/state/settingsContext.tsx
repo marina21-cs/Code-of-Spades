@@ -64,7 +64,10 @@ function deriveSettings(profile: LearningProfile, dyslexicAvailable: boolean): S
     lowMotion: accessibility.lowMotion,
     focusMode: accessibility.focusMode,
     colorVision: accessibility.colorVision,
-    themeColors: getThemeColors({ highContrast: accessibility.highContrast }),
+    themeColors: getThemeColors({
+      highContrast: accessibility.highContrast,
+      colorVision: accessibility.colorVision,
+    }),
     typography: createTypography({ largeText: accessibility.largeText, readerFont: readerFontActive }),
     diagramPalette: getDiagramPalette(accessibility.colorVision),
   };

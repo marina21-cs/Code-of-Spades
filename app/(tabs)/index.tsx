@@ -11,12 +11,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { generateWithPrompt } from '@/ai/generate';
-import { Button, Card, Screen, ThemedText } from '@/components/ui';
+import { Button, Card, ThemedText } from '@/components/ui';
 import { InterruptButton } from '@/features/kasabay/components/InterruptButton';
 import { StudyTimer } from '@/features/kasabay/components/StudyTimer';
 import { SuriDeskCanvas } from '@/features/kasabay/components/SuriDeskCanvas';
+import { KASABAY_THEME } from '@/features/kasabay/constants/kasabayTheme';
 import { buildKasabayPrompt } from '@/features/kasabay/services/kasabayPromptBuilder';
 import { recordStudySession } from '@/gamification/streakService';
 import { TAB_BAR_CLEARANCE } from '@/navigation/tabBarVisibility';
@@ -119,7 +121,7 @@ export default function KasabayModeScreen() {
   const showAnswer = loading || answer.length > 0;
 
   return (
-    <Screen padded={false}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.canvasWrap}>
         <SuriDeskCanvas lowMotion={lowMotion} />
       </View>
@@ -191,22 +193,27 @@ export default function KasabayModeScreen() {
             />
             <InterruptButton onPress={handleInterrupt} />
             {focusMode ? (
-              <ThemedText variant="caption" color={colors.textMuted} center>
+              <ThemedText variant="caption" color={KASABAY_THEME.textMuted} center>
                 Focus mode: panatilihing maikli ang mga sagot ni Suri.
               </ThemedText>
             ) : null}
           </View>
         )}
       </KeyboardAvoidingView>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: KASABAY_THEME.canvas,
+  },
   canvasWrap: {
     flex: 1,
   },
   panel: {
+    backgroundColor: KASABAY_THEME.canvas,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     // Clear the floating tab bar so the focus/interrupt buttons stay tappable.

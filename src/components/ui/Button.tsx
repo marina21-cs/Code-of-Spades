@@ -71,7 +71,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: background },
-        variant === 'outline' && styles.outline,
+        variant === 'outline' && [styles.outline, { borderColor: colors.accentPrimary }],
         fullWidth && styles.fullWidth,
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,

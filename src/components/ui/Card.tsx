@@ -14,7 +14,13 @@ export interface CardProps {
 }
 
 export function Card({ children, neon = false, style }: CardProps) {
-  return <View style={[styles.card, neon && styles.neon, style]}>{children}</View>;
+  // Read the neon accent inline (not from the frozen StyleSheet) so it follows
+  // the live Color Vision palette.
+  return (
+    <View style={[styles.card, neon && [styles.neon, { borderColor: colors.borderNeon }], style]}>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

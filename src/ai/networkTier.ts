@@ -58,7 +58,13 @@ export interface NetworkSnapshot {
 export function classifyNetwork(snapshot: NetworkSnapshot): NetworkTier {
   const { isConnected, isInternetReachable, type } = snapshot;
 
-  if (type === 'none' || isConnected === false || isInternetReachable === false) {
+  // Only treat the device as offline when there is genuinely NO connection.
+  // We intentionally do NOT force offline on `isInternetReachable === false`:
+  // that probe is unreliable on many devices/emulators and would wrongly skip
+  // the cloud (tier 1) entirely. When connected we ALWAYS attempt the cascade
+  // (Gemini first); if the network is truly dead the provider calls fail and the
+  // router degrades to cache + the on-device model anyway (spec 5.2).
+  if (type === 'none' || isConnected === false) {
     return 'offline';
   }
   if (type === 'wifi' || type === 'ethernet') {
@@ -75,8 +81,10 @@ export function classifyNetwork(snapshot: NetworkSnapshot): NetworkTier {
     // Unknown cellular generation: assume weak to keep payloads small.
     return 'weak';
   }
-  // Connected via some other transport: trust reachability, else be cautious.
-  return isInternetReachable === true ? 'strong' : 'weak';
+  // Connected via some other transport: stay ONLINE so tier 1 is still tried.
+  // A false reachability probe only downgrades us to 'weak' (smaller payload),
+  // never to 'offline'.
+  return isInternetReachable === false ? 'weak' : 'strong';
 }
 
 function toSnapshot(state: {

@@ -11,6 +11,7 @@
  * This is intentionally NOT a generative model; it is an honest interim that
  * never fabricates content beyond the retrieved curriculum text.
  */
+import { isDemoMode, runDemoResponse } from './demoResponder';
 
 export interface LocalModelParams {
   system: string;
@@ -38,6 +39,15 @@ export function hasLocalModel(): boolean {
 export async function runLocalModel(params: LocalModelParams): Promise<string> {
   if (registeredRunner) {
     return registeredRunner(params);
+  }
+  // No real on-device SLM registered. In a keyless demo / hackathon build (no
+  // cloud provider keys configured), serve a coherent built-in demo answer so
+  // the student always gets a useful response — this is the path a phone hits
+  // when it can't reach a localhost proxy and the model isn't downloaded.
+  // With real provider keys configured we instead keep the honest, grounded
+  // extractive fallback (never fabricating beyond the retrieved curriculum).
+  if (isDemoMode()) {
+    return runDemoResponse({ user: params.user, onToken: params.onToken, signal: params.signal });
   }
   return runExtractiveFallback(params);
 }

@@ -47,8 +47,8 @@ export function useAccessibleTheme(): AccessibleTheme {
   const readerFontActive = settings.readerFont && dyslexicAvailable;
 
   const colors = useMemo(
-    () => getThemeColors({ highContrast: settings.highContrast }),
-    [settings.highContrast],
+    () => getThemeColors({ highContrast: settings.highContrast, colorVision: settings.colorVision }),
+    [settings.highContrast, settings.colorVision],
   );
 
   const typography = useMemo(

@@ -24,6 +24,9 @@ import {
   type LearningProfile,
   cloneProfile,
 } from './types';
+// Direct import (not the '@/theme' barrel) to avoid a runtime import cycle:
+// the barrel pulls in useAccessibleTheme -> useProfile -> this module.
+import { applyAccessibleColors } from '@/theme/colors';
 
 export interface ProfileRuntimeState {
   readonly profile: LearningProfile;
@@ -52,6 +55,12 @@ function emit(): void {
 }
 
 function patch(next: Partial<ProfileRuntimeState>): void {
+  // Keep the live theme palette in sync BEFORE notifying consumers, so the
+  // re-render triggered by emit() already reads the updated accent/contrast
+  // colors (spec 5.6 Color Vision + High Contrast applied app-wide).
+  if (next.profile) {
+    applyAccessibleColors(next.profile.accessibilitySettings);
+  }
   snapshot = { ...snapshot, ...next };
   emit();
 }

@@ -102,7 +102,7 @@ export default function KwentoScreen() {
                   onPress={() => setSetting(selected ? undefined : id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  style={[styles.chip, selected && styles.chipSelected]}
+                  style={[styles.chip, selected && [styles.chipSelected, { backgroundColor: colors.accentPrimary, borderColor: colors.accentPrimary }]]}
                 >
                   <ThemedText
                     variant="caption"
@@ -211,7 +211,7 @@ export default function KwentoScreen() {
 
           {/* Phase feedback */}
           {phase === 'correct' ? (
-            <Card style={[styles.block, styles.correct]}>
+            <Card style={[styles.block, styles.correct, { borderColor: colors.accentSecondary }]}>
               <ThemedText variant="title" color={colors.accentSecondary}>
                 Tama! Magaling! 🎉
               </ThemedText>
@@ -225,7 +225,7 @@ export default function KwentoScreen() {
           ) : null}
 
           {phase === 'misconception' && misconception?.explanation ? (
-            <Card style={[styles.block, styles.misconception]}>
+            <Card style={[styles.block, styles.misconception, { borderColor: colors.warning }]}>
               <ThemedText variant="label" color={colors.warning}>
                 Tingnan natin muli
               </ThemedText>

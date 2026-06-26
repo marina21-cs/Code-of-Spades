@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { listCachedResponses } from '@/ai/responseCache';
+import { listCachedResponses, type CachedQuery } from '@/ai/responseCache';
 import { ThemedText } from '@/components/ui';
 import { getReviewerItems, type ReviewerItem } from '@/db/ragStore';
 import { TAB_BAR_CLEARANCE, useTabBarScroll } from '@/navigation/tabBarVisibility';
@@ -52,10 +53,29 @@ const FALLBACK_SUBJECTS = [
  * Fallback "Recent AI Cache" rows — shown only when the response_cache table is
  * still empty (fresh install). Mirrors the prototype's example queries.
  */
-const AI_CACHE_FALLBACK = [
-  '"Ano ang photosynthesis at paano ito nangyayari sa mga halaman?"',
-  '"Explain the steps in dividing fractions with examples."',
+const AI_CACHE_FALLBACK: CachedQuery[] = [
+  {
+    queryText: 'Ano ang photosynthesis at paano ito nangyayari sa mga halaman?',
+    responseText:
+      'Halimbawa lang ito. Magtanong kay Suri sa Tanong tab at awtomatikong mase-save dito ang buong sagot para magamit offline.',
+    provider: null,
+    hitCount: 0,
+  },
+  {
+    queryText: 'Explain the steps in dividing fractions with examples.',
+    responseText:
+      'This is just a sample. Ask Suri in the Tanong tab and the full answer is cached here for offline review.',
+    provider: null,
+    hitCount: 0,
+  },
 ];
+
+/** What the detail modal shows for a tapped reviewer item or cached answer. */
+interface ReviewerDetail {
+  title: string;
+  subject?: string | null;
+  body: string;
+}
 
 /** Nearest Ionicons match for a reviewer item's source. */
 function iconForSource(source: ReviewerItem['source']): IoniconName {
@@ -94,16 +114,18 @@ export default function ReviewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   // Real previously-answered questions from the offline response cache (spec 5.3).
-  const [cacheQueries, setCacheQueries] = useState<string[]>([]);
+  const [cached, setCached] = useState<CachedQuery[]>([]);
   // Active curriculum-card filter applied to the Personal Reviewers list below.
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+  // The reviewer item / cached answer currently open in the detail modal.
+  const [detail, setDetail] = useState<ReviewerDetail | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     listCachedResponses(10)
       .then((rows) => {
         if (!cancelled) {
-          setCacheQueries(rows.map((row) => row.queryText));
+          setCached(rows);
         }
       })
       .catch(() => {
@@ -340,6 +362,10 @@ export default function ReviewScreen() {
                 <Pressable
                   key={`${item.source}-${item.id}`}
                   accessibilityRole="button"
+                  accessibilityLabel={`Buksan ang ${item.title}`}
+                  onPress={() =>
+                    setDetail({ title: item.title, subject: item.subject, body: item.content })
+                  }
                   style={[styles.itemRow, index < items.length - 1 && styles.itemRowDivider]}
                 >
                   <View style={styles.itemIcon}>
@@ -382,10 +408,16 @@ export default function ReviewScreen() {
             Recent AI Cache
           </ThemedText>
           <View style={styles.cacheList}>
-            {(cacheQueries.length > 0 ? cacheQueries : AI_CACHE_FALLBACK).map((query, i) => (
-              <Pressable key={i} accessibilityRole="button" style={styles.cacheCard}>
+            {(cached.length > 0 ? cached : AI_CACHE_FALLBACK).map((entry, i) => (
+              <Pressable
+                key={i}
+                accessibilityRole="button"
+                accessibilityLabel={`Buksan ang naka-cache na sagot: ${entry.queryText}`}
+                onPress={() => setDetail({ title: entry.queryText, body: entry.responseText })}
+                style={styles.cacheCard}
+              >
                 <ThemedText variant="body" color={colors.textPrimary} numberOfLines={3} style={styles.weightMedium}>
-                  {query}
+                  {`"${entry.queryText}"`}
                 </ThemedText>
                 <View style={styles.cacheMeta}>
                   <Ionicons name="flash-outline" size={16} color={colors.accentSecondary} />
@@ -403,6 +435,46 @@ export default function ReviewScreen() {
       <Pressable accessibilityRole="button" accessibilityLabel="Scan worksheet" onPress={() => router.push('/scan' as Href)} style={styles.fab}>
         <Ionicons name="scan-outline" size={28} color={colors.textOnAccent} />
       </Pressable>
+
+      {/* Detail view — opens a tapped reviewer item or cached answer in full. */}
+      <Modal
+        visible={detail !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetail(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <ThemedText
+                variant="title"
+                color={colors.textPrimary}
+                style={styles.modalTitle}
+              >
+                {detail?.title}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Isara"
+                hitSlop={8}
+                onPress={() => setDetail(null)}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            {detail?.subject ? (
+              <ThemedText variant="caption" color={colors.accentPrimary} style={styles.weightBold}>
+                {detail.subject}
+              </ThemedText>
+            ) : null}
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+              <ThemedText variant="body" color={colors.textPrimary}>
+                {detail?.body}
+              </ThemedText>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -541,6 +613,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadowSm,
   },
+  subjectCardActive: {
+    borderWidth: 2,
+    borderColor: colors.accentPrimary,
+    backgroundColor: colors.accentPrimaryDim,
+  },
   subjectCardTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -666,4 +743,34 @@ const styles = StyleSheet.create({
   weightBold: { fontWeight: FONT_WEIGHT.bold },
   weightSemibold: { fontWeight: FONT_WEIGHT.semibold },
   weightMedium: { fontWeight: FONT_WEIGHT.medium },
+
+  // Detail modal (bottom sheet).
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.xl,
+    maxHeight: '80%',
+    gap: spacing.sm,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  modalTitle: {
+    flex: 1,
+  },
+  modalScroll: {
+    marginTop: spacing.sm,
+  },
+  modalScrollContent: {
+    paddingBottom: spacing.xl,
+  },
 });

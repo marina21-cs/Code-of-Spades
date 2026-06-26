@@ -13,6 +13,7 @@ import { maybeRegisterSLM } from '@/ai/offlineSLM';
 import { colors, spacing, typography, useAppFonts } from '@/theme';
 import {
   refreshOnboardingStatus,
+  resolveOnboardingFallback,
   useOnboardingStatus,
 } from '@/profile/onboardingState';
 import { SettingsProvider } from '@/state/settingsContext';
@@ -43,10 +44,14 @@ export default function RootLayout() {
     let mounted = true;
 
     // Safety-net timeout: if init hasn't resolved in 8 seconds, proceed
-    // anyway so the student isn't stuck on a spinner forever.
+    // anyway so the student isn't stuck on a spinner forever. We must also
+    // force the onboarding status out of 'unknown' here — the loading gate
+    // blocks on BOTH phase and onboarding status, so resolving phase alone
+    // would leave the spinner up if an earlier init step hung.
     const timeout = setTimeout(() => {
       if (mounted) {
         console.warn('[Suri] Init timed out after 8 s — proceeding with partial init.');
+        resolveOnboardingFallback();
         setState({ phase: 'ready' });
       }
     }, 8000);

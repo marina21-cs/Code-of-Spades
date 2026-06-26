@@ -3,7 +3,7 @@
 // Status: Needs review
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui';
@@ -12,6 +12,7 @@ import { useStreaks } from '@/gamification/useStreaks';
 import { useTabBarScroll } from '@/navigation/tabBarVisibility';
 import {
   COLOR_VISION_MODES,
+  LANGUAGE_PREFERENCES,
   RESPONSE_MODES,
   type AccessibilitySettings,
   type ColorVisionMode,
@@ -21,6 +22,8 @@ import {
 import { useProfile } from '@/profile/useProfile';
 import { syncPendingEvents } from '@/telemetry/syncManager';
 import { colors, FONT_WEIGHT, radii, spacing } from '@/theme';
+import { VisualRenderer } from '@/visuals/VisualRenderer';
+import type { VisualSpec } from '@/visuals/visualParser';
 
 /** Boolean comfort settings (everything except the colorVision selector). */
 type ToggleKey = Exclude<keyof AccessibilitySettings, 'colorVision'>;
@@ -65,6 +68,19 @@ const LANGUAGE_LABEL: Record<LanguagePreference, string> = {
   english: 'English',
 };
 
+/**
+ * A tiny sample chart so the Color Vision setting has an immediate, VISIBLE
+ * effect: the bars re-color to the colorblind-safe palette the moment the mode
+ * changes. (Color Vision applies to Suri's generated diagrams/charts — spec 5.4.)
+ */
+const COLOR_VISION_PREVIEW_SPEC: VisualSpec = {
+  type: 'bar_chart',
+  data: {
+    labels: ['A', 'B', 'K', 'D', 'E'],
+    values: [6, 9, 4, 8, 5],
+  },
+};
+
 /** Avatar placeholder occupying the same 80x80 circular slot as the prototype mascot. */
 const AVATAR_PLACEHOLDER_URI =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBqwqGB5DmpaF6AyNLDmewaRbkTsB776lWri3eWRBHVjfZYQhSBy3jxePTMfwfLRvwDjOZjG-3QPVscbbMEQtneJfuwbJDSykE_PVQSTfApfWWnD9MyyWPaD08BuRNXDh7jP9dln1sA_nbt6VCXhaWcOaTBHL6rIHaGl94ujywV1sn9FNiUcaHcDaJ-j27pZ4Z_Ixy10HpmfSdZCezviiZT26fQ3AFw9vfWa5p2rVmQf4AgD7LzIskedLHAQj5EGqvW8c_FpBVpN_A';
@@ -79,6 +95,11 @@ export default function ProfileScreen() {
   const { profile, update, updateAccessibility, reset } = useProfile();
   const { streak, badges } = useStreaks();
   const tabBarScroll = useTabBarScroll();
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Preview chart width: screen minus the scroll gutters (20*2) and the
+  // preview block padding (spacing.lg*2 ≈ 32), clamped for tablets/small phones.
+  const previewWidth = Math.max(220, Math.min(360, screenWidth - 72));
 
   const settings = profile.accessibilitySettings;
   const currentStreak = streak?.currentStreak ?? 0;
@@ -121,6 +142,12 @@ export default function ProfileScreen() {
   const selectResponseMode = (mode: ResponseMode): void => {
     if (mode !== profile.responseMode) {
       void update({ responseMode: mode });
+    }
+  };
+
+  const selectLanguage = (language: LanguagePreference): void => {
+    if (language !== profile.languagePreference) {
+      void update({ languagePreference: language });
     }
   };
 
@@ -222,13 +249,49 @@ export default function ProfileScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     onPress={() => selectResponseMode(mode)}
-                    style={[styles.segment, active && styles.segmentActive]}
+                    style={[styles.segment, active && [styles.segmentActive, { backgroundColor: colors.accentPrimary }]]}
                   >
                     <ThemedText
                       variant="label"
                       color={active ? colors.textOnAccent : colors.textSecondary}
                     >
                       {RESPONSE_MODE_LABEL[mode]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* Group 1b: Wika (language register) — feeds buildSystemPrompt's
+            languageDirective, so the online AI answers in the chosen register. */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText variant="title" style={styles.bold}>
+              Wika ni Suri
+            </ThemedText>
+            <ThemedText variant="caption" color={colors.textSecondary} style={styles.sectionSubtitle}>
+              Purong Filipino, Taglish, o purong English?
+            </ThemedText>
+          </View>
+          <View style={styles.sectionBody}>
+            <View style={styles.segmented}>
+              {LANGUAGE_PREFERENCES.map((language) => {
+                const active = profile.languagePreference === language;
+                return (
+                  <Pressable
+                    key={language}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => selectLanguage(language)}
+                    style={[styles.segment, active && [styles.segmentActive, { backgroundColor: colors.accentPrimary }]]}
+                  >
+                    <ThemedText
+                      variant="label"
+                      color={active ? colors.textOnAccent : colors.textSecondary}
+                    >
+                      {LANGUAGE_LABEL[language]}
                     </ThemedText>
                   </Pressable>
                 );
@@ -289,6 +352,22 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </Pressable>
+
+            {/* Live preview so Color Vision has an immediate, visible effect:
+                these bars recolor to the colorblind-safe palette as you cycle. */}
+            <View style={styles.previewBlock}>
+              <ThemedText variant="caption" color={colors.textSecondary} style={styles.previewLabel}>
+                Pansilip — kulay ng tsart: {COLOR_VISION_LABEL[settings.colorVision]}
+              </ThemedText>
+              <View style={styles.previewChart}>
+                <VisualRenderer
+                  spec={COLOR_VISION_PREVIEW_SPEC}
+                  width={previewWidth}
+                  height={150}
+                  colorVisionMode={settings.colorVision}
+                />
+              </View>
+            </View>
           </View>
         </View>
 
@@ -448,6 +527,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md, // gap-3
+  },
+  previewBlock: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: 20,
+    gap: spacing.md,
+  },
+  previewLabel: {
+    fontWeight: '600',
+  },
+  previewChart: {
+    alignItems: 'center',
   },
   pill: {
     backgroundColor: colors.surfaceAlt, // secondary-container
