@@ -19,6 +19,7 @@ import { StudyTimer } from '@/features/kasabay/components/StudyTimer';
 import { SuriDeskCanvas } from '@/features/kasabay/components/SuriDeskCanvas';
 import { buildKasabayPrompt } from '@/features/kasabay/services/kasabayPromptBuilder';
 import { recordStudySession } from '@/gamification/streakService';
+import { TAB_BAR_CLEARANCE } from '@/navigation/tabBarVisibility';
 import { useProfile } from '@/profile/useProfile';
 import { colors, radii, spacing, typography } from '@/theme';
 
@@ -207,7 +208,9 @@ const styles = StyleSheet.create({
   },
   panel: {
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
+    // Clear the floating tab bar so the focus/interrupt buttons stay tappable.
+    paddingBottom: TAB_BAR_CLEARANCE,
     gap: spacing.lg,
   },
   stack: {

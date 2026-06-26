@@ -28,10 +28,6 @@ export class OcrNotAvailableError extends Error {
   }
 }
 
-/** Candidate native modules, tried in order. A variable specifier keeps tsc from
- *  requiring these (uninstalled) packages and lets the import fail gracefully. */
-const NATIVE_OCR_MODULES = ['@react-native-ml-kit/text-recognition'];
-
 /** Normalize a variety of native result shapes into our RecognizedText. */
 function normalizeNativeResult(result: unknown): RecognizedText {
   const r = (result ?? {}) as { text?: unknown; blocks?: unknown };
@@ -47,23 +43,23 @@ function normalizeNativeResult(result: unknown): RecognizedText {
 }
 
 /**
- * The default recognizer: lazily load a native ML Kit module and run it. Throws
- * OcrNotAvailableError if no supported module is installed.
+ * The default recognizer: lazily load the native ML Kit module and run it. Throws
+ * OcrNotAvailableError if the module isn't available at runtime (e.g. Expo Go or
+ * a build without the native module linked).
  */
 export const defaultTextRecognizer: TextRecognizer = async (imageUri: string) => {
-  for (const moduleName of NATIVE_OCR_MODULES) {
-    try {
-      // Variable specifier: not statically resolved by tsc; resolves at runtime
-      // only if the package is actually installed.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mod: any = await import(moduleName);
-      const engine = mod?.default ?? mod;
-      if (engine && typeof engine.recognize === 'function') {
-        return normalizeNativeResult(await engine.recognize(imageUri));
-      }
-    } catch {
-      // Try the next candidate, then fall through to the not-available error.
+  try {
+    // Static specifier so Metro can resolve it at bundle time; still lazy (only
+    // evaluated when OCR actually runs), so headless/node contexts that never
+    // call this never touch the native module.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: any = await import('@react-native-ml-kit/text-recognition');
+    const engine = mod?.default ?? mod;
+    if (engine && typeof engine.recognize === 'function') {
+      return normalizeNativeResult(await engine.recognize(imageUri));
     }
+  } catch {
+    // Fall through to the not-available error below.
   }
   throw new OcrNotAvailableError('no supported native module found');
 };

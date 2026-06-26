@@ -2,7 +2,8 @@
 // Visual Reference: zip(4).zip | Backend: Existing Suri Services
 // Status: Needs review
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui';
@@ -18,6 +19,7 @@ import {
   type ResponseMode,
 } from '@/profile/types';
 import { useProfile } from '@/profile/useProfile';
+import { syncPendingEvents } from '@/telemetry/syncManager';
 import { colors, FONT_WEIGHT, radii, spacing } from '@/theme';
 
 /** Boolean comfort settings (everything except the colorVision selector). */
@@ -81,6 +83,23 @@ export default function ProfileScreen() {
   const settings = profile.accessibilitySettings;
   const currentStreak = streak?.currentStreak ?? 0;
   const earnedBadges = badges.filter((badge) => badge.earnedAt !== null).length;
+
+  // "I-sync ang Progress" — flush the local telemetry queue (spec 5.10).
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
+
+  const handleSync = useCallback(async () => {
+    if (syncStatus === 'syncing') {
+      return;
+    }
+    setSyncStatus('syncing');
+    try {
+      await syncPendingEvents();
+      setSyncStatus('done');
+      setTimeout(() => setSyncStatus('idle'), 2500);
+    } catch {
+      setSyncStatus('idle');
+    }
+  }, [syncStatus]);
 
   const summaryParts: string[] = [`Grade ${profile.gradeLevel}`];
   if (profile.subject) {
@@ -160,12 +179,27 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Sync Action (visual; remote sync is not part of the offline-first MVP). */}
-        <Pressable style={styles.syncButton} accessibilityRole="button" onPress={() => {}}>
+        {/* Sync Action — drains the anonymized telemetry queue (pushBatch stub
+            today; real Supabase push lands when the B2B backend is provisioned). */}
+        <Pressable
+          style={styles.syncButton}
+          accessibilityRole="button"
+          accessibilityState={{ busy: syncStatus === 'syncing' }}
+          disabled={syncStatus === 'syncing'}
+          onPress={handleSync}
+        >
           <ThemedText variant="button" color={colors.accentPrimary}>
-            I-sync ang Progress
+            {syncStatus === 'done' ? 'Progress synced!' : 'I-sync ang Progress'}
           </ThemedText>
-          <Ionicons name="chevron-forward" size={20} color={colors.accentPrimary} />
+          {syncStatus === 'syncing' ? (
+            <ActivityIndicator color={colors.accentPrimary} />
+          ) : (
+            <Ionicons
+              name={syncStatus === 'done' ? 'checkmark-circle' : 'chevron-forward'}
+              size={20}
+              color={colors.accentPrimary}
+            />
+          )}
         </Pressable>
 
         {/* Group 1: Paraan ng Pagpapaliwanag (response mode) */}

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { listCachedResponses } from '@/ai/responseCache';
 import { ThemedText } from '@/components/ui';
 import { getReviewerItems, type ReviewerItem } from '@/db/ragStore';
 import { TAB_BAR_CLEARANCE, useTabBarScroll } from '@/navigation/tabBarVisibility';
@@ -47,8 +48,11 @@ const FALLBACK_SUBJECTS = [
   { title: 'Grade 6 AP', desc: 'Philippine History and Government.', count: 30 },
 ];
 
-/** Static "Recent AI Cache" rows — no listing service maps to this, kept visually. */
-const AI_CACHE = [
+/**
+ * Fallback "Recent AI Cache" rows — shown only when the response_cache table is
+ * still empty (fresh install). Mirrors the prototype's example queries.
+ */
+const AI_CACHE_FALLBACK = [
   '"Ano ang photosynthesis at paano ito nangyayari sa mga halaman?"',
   '"Explain the steps in dividing fractions with examples."',
 ];
@@ -89,6 +93,26 @@ export default function ReviewScreen() {
   const [items, setItems] = useState<ReviewerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // Real previously-answered questions from the offline response cache (spec 5.3).
+  const [cacheQueries, setCacheQueries] = useState<string[]>([]);
+  // Active curriculum-card filter applied to the Personal Reviewers list below.
+  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listCachedResponses(10)
+      .then((rows) => {
+        if (!cancelled) {
+          setCacheQueries(rows.map((row) => row.queryText));
+        }
+      })
+      .catch(() => {
+        /* Non-critical: fall back to the example rows on any read error. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +160,12 @@ export default function ReviewScreen() {
           count: group.items.length,
         }))
       : FALLBACK_SUBJECTS.map((s) => ({ key: s.title, title: s.title, desc: s.desc, count: s.count }));
+
+  // Whether the curriculum cards map to real subjects we can filter the list by.
+  const hasRealSubjects = subjects.length > 0;
+  const visibleItems = subjectFilter
+    ? items.filter((item) => (item.subject ?? 'Iba pa') === subjectFilter)
+    : items;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -202,7 +232,12 @@ export default function ReviewScreen() {
             <ThemedText variant="h2" color={colors.textPrimary}>
               Curriculum Content
             </ThemedText>
-            <Pressable accessibilityRole="button" hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ipakita lahat ng reviewer"
+              hitSlop={8}
+              onPress={() => setSubjectFilter(null)}
+            >
               <ThemedText variant="bodySmall" color={colors.accentPrimary} style={styles.weightBold}>
                 View All
               </ThemedText>
@@ -220,36 +255,54 @@ export default function ReviewScreen() {
               style={styles.carouselScroll}
               contentContainerStyle={styles.carousel}
             >
-              {curriculumCards.map((card) => (
-                <Pressable key={card.key} accessibilityRole="button" style={styles.subjectCard}>
-                  <View style={styles.subjectCardTop}>
-                    <View style={styles.subjectIcon}>
-                      <Ionicons name="library-outline" size={24} color={colors.textSecondary} />
+              {curriculumCards.map((card) => {
+                const active = hasRealSubjects && subjectFilter === card.title;
+                return (
+                  <Pressable
+                    key={card.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={`Salain ang reviewer ayon sa ${card.title}`}
+                    onPress={() =>
+                      hasRealSubjects
+                        ? setSubjectFilter((prev) => (prev === card.title ? null : card.title))
+                        : router.push('/scan' as Href)
+                    }
+                    style={[styles.subjectCard, active && styles.subjectCardActive]}
+                  >
+                    <View style={styles.subjectCardTop}>
+                      <View style={styles.subjectIcon}>
+                        <Ionicons name="library-outline" size={24} color={colors.textSecondary} />
+                      </View>
+                      <View style={styles.readyBadge}>
+                        <ThemedText variant="caption" color={colors.textSecondary} style={styles.weightBold}>
+                          Ready
+                        </ThemedText>
+                      </View>
                     </View>
-                    <View style={styles.readyBadge}>
-                      <ThemedText variant="caption" color={colors.textSecondary} style={styles.weightBold}>
-                        Ready
+
+                    <View>
+                      <ThemedText variant="title" color={colors.textPrimary} style={styles.weightBold}>
+                        {card.title}
+                      </ThemedText>
+                      <ThemedText variant="body" color={colors.textSecondary} style={styles.subjectDesc}>
+                        {card.desc}
                       </ThemedText>
                     </View>
-                  </View>
 
-                  <View>
-                    <ThemedText variant="title" color={colors.textPrimary} style={styles.weightBold}>
-                      {card.title}
-                    </ThemedText>
-                    <ThemedText variant="body" color={colors.textSecondary} style={styles.subjectDesc}>
-                      {card.desc}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.subjectCardFooter}>
-                    <ThemedText variant="bodySmall" color={colors.textSecondary} style={styles.weightSemibold}>
-                      {card.count} MELCs
-                    </ThemedText>
-                    <Ionicons name="arrow-forward" size={20} color={colors.textSecondary} />
-                  </View>
-                </Pressable>
-              ))}
+                    <View style={styles.subjectCardFooter}>
+                      <ThemedText variant="bodySmall" color={colors.textSecondary} style={styles.weightSemibold}>
+                        {card.count} MELCs
+                      </ThemedText>
+                      <Ionicons
+                        name={active ? 'checkmark-circle' : 'arrow-forward'}
+                        size={20}
+                        color={active ? colors.accentPrimary : colors.textSecondary}
+                      />
+                    </View>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           )}
         </View>
@@ -329,7 +382,7 @@ export default function ReviewScreen() {
             Recent AI Cache
           </ThemedText>
           <View style={styles.cacheList}>
-            {AI_CACHE.map((query, i) => (
+            {(cacheQueries.length > 0 ? cacheQueries : AI_CACHE_FALLBACK).map((query, i) => (
               <Pressable key={i} accessibilityRole="button" style={styles.cacheCard}>
                 <ThemedText variant="body" color={colors.textPrimary} numberOfLines={3} style={styles.weightMedium}>
                   {query}

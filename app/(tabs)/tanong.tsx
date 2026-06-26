@@ -73,6 +73,9 @@ export default function TanongScreen() {
   const [isSending, setIsSending] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
+  // Context lens for the chips above the input. 'local' forces the offline
+  // "Suri Local" indicator; 'auto' follows live connectivity.
+  const [chatMode, setChatMode] = useState<'auto' | 'local'>('auto');
 
   const scrollRef = useRef<ScrollView>(null);
   const idCounter = useRef(0);
@@ -84,7 +87,7 @@ export default function TanongScreen() {
   // Badge source of truth: while a request is in flight, trust the tier the
   // router reported via onTierChange; when idle, reflect live connectivity.
   const displayTier = isSending ? tier : net.tier;
-  const isOffline = displayTier === 'offline';
+  const isOffline = chatMode === 'local' || displayTier === 'offline';
   const canSend = input.trim().length > 0 && !isSending;
 
   /** Append the user bubble + an empty assistant bubble, then stream the reply. */
@@ -290,6 +293,61 @@ export default function TanongScreen() {
           )}
         </ScrollView>
 
+        {/* Quick context chips — switch lens or jump to Kwento mode. */}
+        <View style={styles.modeChips}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: chatMode === 'local' }}
+            style={[styles.modeChip, chatMode === 'local' && styles.modeChipActive]}
+            onPress={() => setChatMode('local')}
+          >
+            <Ionicons
+              name="moon"
+              size={14}
+              color={chatMode === 'local' ? colors.textOnAccent : colors.textSecondary}
+            />
+            <ThemedText
+              variant="caption"
+              color={chatMode === 'local' ? colors.textOnAccent : colors.textSecondary}
+              style={styles.modeChipText}
+            >
+              Suri Local
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pumunta sa Kwento mode"
+            style={styles.modeChip}
+            onPress={() => router.push('/(tabs)/kwento' as Href)}
+          >
+            <Ionicons name="book-outline" size={14} color={colors.textSecondary} />
+            <ThemedText variant="caption" color={colors.textSecondary} style={styles.modeChipText}>
+              Kwento
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: chatMode === 'auto' }}
+            style={[styles.modeChip, chatMode === 'auto' && styles.modeChipActive]}
+            onPress={() => setChatMode('auto')}
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={14}
+              color={chatMode === 'auto' ? colors.textOnAccent : colors.textSecondary}
+            />
+            <ThemedText
+              variant="caption"
+              color={chatMode === 'auto' ? colors.textOnAccent : colors.textSecondary}
+              style={styles.modeChipText}
+            >
+              Tanong
+            </ThemedText>
+          </Pressable>
+        </View>
+
         {/* Input area — in-flow so it rests above the tab bar. */}
         <View style={styles.inputRow}>
           <Pressable
@@ -316,12 +374,12 @@ export default function TanongScreen() {
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Ipadala"
+            accessibilityLabel={canSend ? 'Ipadala' : 'Magsalita'}
             disabled={!canSend}
             style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             onPress={handleSend}
           >
-            <Ionicons name="mic" size={24} color={colors.textOnAccent} />
+            <Ionicons name={canSend ? 'send' : 'mic'} size={22} color={colors.textOnAccent} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -535,6 +593,33 @@ const styles = StyleSheet.create({
     ...shadowSm,
   },
   listenLabel: {
+    fontWeight: '600',
+  },
+
+  // Quick context chips.
+  modeChips: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  modeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  modeChipActive: {
+    backgroundColor: colors.accentPrimary,
+    borderColor: colors.accentPrimary,
+  },
+  modeChipText: {
     fontWeight: '600',
   },
 

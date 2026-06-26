@@ -17,13 +17,16 @@ import { radii, spacing, useAccessibleTheme } from '@/theme';
 
 import { useTabBarTranslateY } from './tabBarVisibility';
 
-/** Cohesive dark "tambayan" surface for the floating bar (matches Kasabay). */
-const BAR_DARK = {
-  surface: '#16213E',
-  active: '#00CEC9', // neon teal
-  activeWash: 'rgba(0, 206, 201, 0.16)',
-  inactive: '#9AA0B5',
-  border: 'rgba(255, 255, 255, 0.08)',
+/**
+ * Warm light surface for the floating bar, matched to the screenshot palette
+ * (cream canvas, white card, terracotta accent). No neon, no dark canvas.
+ */
+const BAR_LIGHT = {
+  surface: '#ffffff', // surface-container-lowest (white card on cream bg)
+  active: '#a03b0e', // primary (terracotta)
+  activeWash: 'rgba(160, 59, 14, 0.12)', // primary-container wash
+  inactive: '#8b7269', // outline / muted
+  border: '#dec0b6', // outline-variant
 } as const;
 
 /** High-contrast variant (spec 5.6): pure black/white with a heavy border. */
@@ -38,7 +41,7 @@ const BAR_HC = {
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const { highContrast } = useAccessibleTheme();
   const translateY = useTabBarTranslateY();
-  const palette = highContrast ? BAR_HC : BAR_DARK;
+  const palette = highContrast ? BAR_HC : BAR_LIGHT;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY ? translateY.value : 0 }],
@@ -125,12 +128,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    // Soft floating shadow.
+    // Soft floating shadow (kept light for the cream canvas).
     shadowColor: '#000000',
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.12,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    ...Platform.select({ android: { elevation: 12 }, default: {} }),
+    ...Platform.select({ android: { elevation: 8 }, default: {} }),
   },
   item: {
     flex: 1,

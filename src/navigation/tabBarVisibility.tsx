@@ -18,9 +18,11 @@ import { useSharedValue, withTiming, type SharedValue } from 'react-native-reani
 export const TAB_BAR_HIDDEN_OFFSET = 140;
 /**
  * Vertical space a screen should reserve at the bottom so its last items are
- * not covered by the floating bar (bar height + bottom inset + breathing room).
+ * not covered by the floating bar. Covers the bar height PLUS a typical bottom
+ * safe-area inset (the bar positions itself above the inset), with breathing
+ * room, so controls stay tappable on both button- and gesture-nav devices.
  */
-export const TAB_BAR_CLEARANCE = 108;
+export const TAB_BAR_CLEARANCE = 132;
 
 interface TabBarVisibilityValue {
   translateY: SharedValue<number>;
