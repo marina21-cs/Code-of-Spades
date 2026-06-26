@@ -6,7 +6,9 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing, cancelAnimation } from 'react-native-reanimated';
 
-import { colors, radii } from '@/theme';
+import { radii } from '@/theme';
+
+import { KASABAY_THEME } from '../constants/kasabayTheme';
 
 export interface SuriIdleAnimationProps {
   /** When true, render a completely static avatar (spec 5.6 reduce-motion). */
@@ -59,8 +61,8 @@ export function SuriIdleAnimation({ lowMotion, size = 112 }: SuriIdleAnimationPr
 
   const avatar = (
     <View style={[styles.desk, deskStyle]}>
-      <Ionicons name="cafe" size={size * 0.22} color={colors.accentSecondary} style={styles.accent} />
-      <Ionicons name="book" size={size * 0.46} color={colors.accentPrimary} />
+      <Ionicons name="cafe" size={size * 0.22} color={KASABAY_THEME.lime} style={styles.accent} />
+      <Ionicons name="book" size={size * 0.46} color={KASABAY_THEME.teal} />
     </View>
   );
 
@@ -78,11 +80,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   desk: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: KASABAY_THEME.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.borderNeon,
+    borderColor: KASABAY_THEME.teal,
   },
   accent: {
     position: 'absolute',

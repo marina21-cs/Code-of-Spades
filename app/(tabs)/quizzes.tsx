@@ -113,6 +113,7 @@ function iconColorFor(tone: IconTone): string {
 export default function QuizzesScreen() {
   const router = useRouter();
   const { profile } = useProfile();
+  const tabBarScroll = useTabBarScroll();
 
   // <TopBar onSettings> -> open the Profile tab (settings live there).
   const openSettings = () => router.push(PROFILE_ROUTE);
@@ -146,6 +147,8 @@ export default function QuizzesScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
       >
         {/* Header Section — flex-col-reverse: mascot on top, copy below. */}
         <View style={[styles.heroCard, styles.shadowSm]}>
@@ -311,7 +314,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.xl, // px-5
     paddingTop: spacing.xxl, // pt-8
-    paddingBottom: spacing.xxl, // pb-* (clears tab bar)
+    paddingBottom: TAB_BAR_CLEARANCE + spacing.lg, // clears the floating tab bar
     gap: spacing.xxxl, // space-y-12 (48)
   },
 

@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
+
+import { KASABAY_THEME } from '../constants/kasabayTheme';
 
 export interface StudyTimerProps {
   /** Planned focus block length in minutes. Default 25 (a Pomodoro). */
@@ -63,10 +65,15 @@ export function StudyTimer({ durationMinutes = 25, running, onComplete }: StudyT
 
   return (
     <View style={styles.container}>
-      <ThemedText variant="display" center accessibilityRole="timer">
+      <ThemedText
+        variant="display"
+        center
+        color={running ? KASABAY_THEME.teal : KASABAY_THEME.textPrimary}
+        accessibilityRole="timer"
+      >
         {formatSeconds(secondsLeft)}
       </ThemedText>
-      <ThemedText variant="caption" color={colors.textMuted} center>
+      <ThemedText variant="caption" color={KASABAY_THEME.textMuted} center>
         {status}
       </ThemedText>
     </View>

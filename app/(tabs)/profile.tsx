@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ui';
 import { DevTools } from '@/features/dev/DevMenu';
 import { useStreaks } from '@/gamification/useStreaks';
+import { useTabBarScroll } from '@/navigation/tabBarVisibility';
 import {
   COLOR_VISION_MODES,
   RESPONSE_MODES,
@@ -75,6 +76,7 @@ const AVATAR_PLACEHOLDER_URI =
 export default function ProfileScreen() {
   const { profile, update, updateAccessibility, reset } = useProfile();
   const { streak, badges } = useStreaks();
+  const tabBarScroll = useTabBarScroll();
 
   const settings = profile.accessibilitySettings;
   const currentStreak = streak?.currentStreak ?? 0;
@@ -119,7 +121,12 @@ export default function ProfileScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
+      >
         {/* Page Header */}
         <View style={styles.pageHeader}>
           <View style={styles.avatarWrap}>

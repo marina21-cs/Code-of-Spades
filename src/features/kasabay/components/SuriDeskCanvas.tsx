@@ -4,8 +4,9 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
+import { KASABAY_THEME } from '../constants/kasabayTheme';
 import { SuriIdleAnimation } from './SuriIdleAnimation';
 
 export interface SuriDeskCanvasProps {
@@ -14,15 +15,15 @@ export interface SuriDeskCanvasProps {
 }
 
 /**
- * The full-bleed "tambayan" study-desk canvas (spec 5.10). A dark surface framed
- * by neon teal (top) and lime (bottom) accents, with Suri centered at her desk.
- * Deliberately minimal chrome — the focus is the shared study space.
+ * The full-bleed "tambayan" study-desk canvas (spec 5.10). A dark OLED surface
+ * framed by neon teal (top) and lime (bottom) accents, with Suri centered at her
+ * desk. Deliberately minimal chrome — the focus is the shared study space.
  */
 export function SuriDeskCanvas({ lowMotion }: SuriDeskCanvasProps) {
   return (
     <View style={styles.canvas}>
       <SuriIdleAnimation lowMotion={lowMotion} />
-      <ThemedText variant="caption" color={colors.textMuted} center>
+      <ThemedText variant="caption" color={KASABAY_THEME.textMuted} center>
         Kasabay mo si Suri
       </ThemedText>
     </View>
@@ -32,7 +33,7 @@ export function SuriDeskCanvas({ lowMotion }: SuriDeskCanvasProps) {
 const styles = StyleSheet.create({
   canvas: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: KASABAY_THEME.canvas,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.lg,
@@ -40,7 +41,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
     borderTopWidth: 2,
     borderBottomWidth: 2,
-    borderTopColor: colors.borderNeon,
-    borderBottomColor: colors.borderNeonAlt,
+    borderTopColor: KASABAY_THEME.teal,
+    borderBottomColor: KASABAY_THEME.lime,
   },
 });
