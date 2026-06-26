@@ -115,7 +115,7 @@ export async function getNetworkTier(): Promise<NetworkTier> {
  * and toggling the override re-emits the resolved tier immediately.
  */
 export function subscribeNetworkTier(listener: (tier: NetworkTier) => void): () => void {
-  let latest: NetworkTier = 'offline';
+  let latest: NetworkTier = 'strong';
   let netinfoUnsub: () => void = () => {};
 
   const emit = (tier: NetworkTier): void => {

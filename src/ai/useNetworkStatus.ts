@@ -24,7 +24,7 @@ export function useNetworkStatus(): {
   isOffline: boolean;
   forceOffline: boolean;
 } {
-  const [tier, setTier] = useState<NetworkTier>('offline');
+  const [tier, setTier] = useState<NetworkTier>('strong');
   const [forceOffline, setForceOffline] = useState<boolean>(isForceOffline());
 
   useEffect(() => {

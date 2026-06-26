@@ -16,6 +16,7 @@
 import type { LearningProfile } from '@/profile/types';
 import type { NetworkTier } from './networkTier';
 import { maxTokensForNetworkTier, topKForNetworkTier } from './routerPolicy';
+import { isDemoMode, runDemoResponse } from './demoResponder';
 
 export interface ProviderHandle {
   id: string;
@@ -92,6 +93,14 @@ export async function executeRoute(options: RouteOptions, deps: RouteDeps): Prom
     const maxTokens = maxTokensForNetworkTier(tier);
     const ragChunks = await deps.retrieve(message, gradeLevel, k);
     const system = deps.buildPrompt(profile, ragChunks);
+
+    // Demo mode: no API keys configured — use the built-in demo responder
+    // so the app works out-of-the-box for demos / hackathon presentations.
+    if (isDemoMode()) {
+      const full = await runDemoResponse({ user: message, onToken, signal });
+      onDone?.(full, tier);
+      return { text: full, tier, source: 'demo' };
+    }
 
     const providers = await deps.getProviders();
     for (const provider of providers) {
