@@ -11,6 +11,8 @@ import {
   COLOR_VISION_MODES,
   type ColorVisionMode,
   DEFAULT_PROFILE,
+  LANGUAGE_PREFERENCES,
+  type LanguagePreference,
   type LearningProfile,
   MAX_GRADE_LEVEL,
   MIN_GRADE_LEVEL,
@@ -43,6 +45,20 @@ function asGradeLevel(value: unknown): number {
   return Math.min(MAX_GRADE_LEVEL, Math.max(MIN_GRADE_LEVEL, rounded));
 }
 
+function asLanguagePreference(value: unknown): LanguagePreference {
+  return LANGUAGE_PREFERENCES.includes(value as LanguagePreference)
+    ? (value as LanguagePreference)
+    : DEFAULT_PROFILE.languagePreference;
+}
+
+function asSubject(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return DEFAULT_PROFILE.subject;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 /**
  * Coerce arbitrary parsed input into a complete, valid LearningProfile by
  * merging against defaults and validating every field.
@@ -58,6 +74,8 @@ export function normalizeProfile(input: unknown): LearningProfile {
   return {
     responseMode: asResponseMode(obj.responseMode),
     gradeLevel: asGradeLevel(obj.gradeLevel),
+    languagePreference: asLanguagePreference(obj.languagePreference),
+    subject: asSubject(obj.subject),
     accessibilitySettings: {
       readerFont: asBoolean(accInput.readerFont, defaults.readerFont),
       colorVision: asColorVision(accInput.colorVision),

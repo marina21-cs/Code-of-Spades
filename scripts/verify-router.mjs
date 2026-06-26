@@ -3,10 +3,10 @@
  *
  * WHY THIS EXISTS:
  *   The live router (aiRouter.ts) depends on native modules (netinfo,
- *   expo-secure-store, expo-sqlite, expo/fetch), so the in-app verifyRouter()
- *   needs a device. This script verifies everything that is pure/injectable:
+ *   expo-sqlite, expo/fetch), so the in-app verifyRouter() needs a device. This
+ *   script verifies everything that is pure/injectable:
  *     - SSEStreamParser byte-chunk buffering + [DONE] handling (real parser)
- *     - streamChatCompletion end-to-end with a mock streaming fetch (real client)
+ *     - streamProxyResponse end-to-end with a mock streaming fetch (real client)
  *     - executeRoute branching for strong / weak / offline / cache / full-failover
  *       (the REAL orchestration, with mocked collaborators)
  *     - query hashing + tier policy
@@ -16,7 +16,7 @@
  * RUN: node --import ./scripts/register-ts.mjs scripts/verify-router.mjs
  */
 import { SSEStreamParser } from '../src/ai/sse.ts';
-import { ProviderHttpError, streamChatCompletion } from '../src/ai/cloudClient.ts';
+import { ProxyHttpError, streamProxyResponse } from '../src/ai/cloudClient.ts';
 import { executeRoute } from '../src/ai/routerCore.ts';
 import {
   hashQuery,
@@ -88,6 +88,10 @@ function provider(id, impl) {
 }
 
 async function main() {
+  // Proxy config is read lazily by getProxyConfig(), so set it before streaming.
+  process.env.EXPO_PUBLIC_PROXY_URL = 'https://proxy.test/functions/v1/suri-ai-proxy';
+  process.env.EXPO_PUBLIC_PROXY_TOKEN = 'test-token';
+
   // --- 1. SSE parser: split a token across chunk boundaries -----------------
   {
     const parser = new SSEStreamParser();
@@ -100,36 +104,30 @@ async function main() {
     check(events.some((e) => e.type === 'done'), 'SSE emits a done event on [DONE]');
   }
 
-  // --- 2. cloudClient: full stream over a mock fetch ------------------------
+  // --- 2. cloudClient: full stream from the proxy over a mock fetch ---------
   {
     const tokens = [];
-    const full = await streamChatCompletion({
-      baseURL: 'https://example.test/v1',
-      apiKey: 'unused',
-      model: 'test',
+    const full = await streamProxyResponse({
       messages: [{ role: 'user', content: 'hi' }],
       onToken: (t) => tokens.push(t),
       fetchImpl: mockFetch([sseLine('Hello'), sseLine(', world'), 'data: [DONE]\n\n']),
     });
-    check(full === 'Hello, world', `streamChatCompletion concatenates deltas (got "${full}")`);
+    check(full === 'Hello, world', `streamProxyResponse concatenates deltas (got "${full}")`);
     check(tokens.length === 2, `onToken fired once per delta (got ${tokens.length})`);
   }
 
-  // --- 3. cloudClient: non-OK response throws ProviderHttpError -------------
+  // --- 3. cloudClient: non-OK proxy response throws ProxyHttpError ----------
   {
     let thrown = null;
     try {
-      await streamChatCompletion({
-        baseURL: 'https://example.test/v1',
-        apiKey: 'unused',
-        model: 'test',
+      await streamProxyResponse({
         messages: [{ role: 'user', content: 'hi' }],
         fetchImpl: mockFetch([], { ok: false, status: 429 }),
       });
     } catch (err) {
       thrown = err;
     }
-    check(thrown instanceof ProviderHttpError && thrown.status === 429, 'HTTP 429 surfaces as ProviderHttpError');
+    check(thrown instanceof ProxyHttpError && thrown.status === 429, 'HTTP 429 surfaces as ProxyHttpError');
   }
 
   // --- 4. strong tier: cascade fails over to the second provider ------------

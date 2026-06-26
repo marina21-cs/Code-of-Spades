@@ -15,6 +15,13 @@ export type ResponseMode = 'visual' | 'auditory' | 'reading' | 'kinesthetic' | '
 /** Colorblind-safe palette selection applied to generated diagrams/charts. */
 export type ColorVisionMode = 'standard' | 'deuteranopia' | 'protanopia' | 'tritanopia';
 
+/**
+ * Language register the student learns in (spec 5.8 / onboarding language step).
+ * Mirrors KwentoLanguage in the kwento-mode feature; this is the canonical,
+ * profile-level source of truth.
+ */
+export type LanguagePreference = 'tagalog' | 'taglish' | 'english';
+
 /** All response modes, ordered. Exported for validation + UI iteration later. */
 export const RESPONSE_MODES: readonly ResponseMode[] = [
   'visual',
@@ -30,6 +37,13 @@ export const COLOR_VISION_MODES: readonly ColorVisionMode[] = [
   'deuteranopia',
   'protanopia',
   'tritanopia',
+] as const;
+
+/** All language preferences, ordered. Exported for UI iteration + validation. */
+export const LANGUAGE_PREFERENCES: readonly LanguagePreference[] = [
+  'tagalog',
+  'taglish',
+  'english',
 ] as const;
 
 /**
@@ -51,6 +65,10 @@ export interface LearningProfile {
   readonly responseMode: ResponseMode;
   readonly accessibilitySettings: AccessibilitySettings;
   readonly gradeLevel: number;
+  /** Language register for AI responses + Kwento stories (onboarding step 2). */
+  readonly languagePreference: LanguagePreference;
+  /** Primary subject focus chosen at onboarding (e.g. "Science"); null = none. */
+  readonly subject: string | null;
 }
 
 /** Sane grade bounds for DepEd K-12 (used to clamp untrusted stored values). */
@@ -75,6 +93,8 @@ export const DEFAULT_PROFILE: LearningProfile = Object.freeze({
   responseMode: 'mixed',
   accessibilitySettings: DEFAULT_ACCESSIBILITY_SETTINGS,
   gradeLevel: 6,
+  languagePreference: 'taglish',
+  subject: null,
 });
 
 /** Produce a fresh, mutable-shaped copy (nested settings copied too). */
@@ -82,6 +102,8 @@ export function cloneProfile(profile: LearningProfile): LearningProfile {
   return {
     responseMode: profile.responseMode,
     gradeLevel: profile.gradeLevel,
+    languagePreference: profile.languagePreference,
+    subject: profile.subject,
     accessibilitySettings: { ...profile.accessibilitySettings },
   };
 }

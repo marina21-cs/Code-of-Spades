@@ -1,22 +1,21 @@
 /**
- * 3-tier speech-to-text manager (spec 5.7).
+ * Speech-to-text manager (spec 5.7) — native on-device recognition.
  *
- *   online + Groq key : record audio (expo-av) -> Groq Whisper API -> text
- *   offline / no key   : native OS recognition (expo-speech-recognition)
+ * Cloud Whisper (Groq) STT required an API key ON THE CLIENT. After the security
+ * refactor that moved every provider key to the server proxy, the client no
+ * longer holds that key, so STT now uses the native OS recognizer
+ * (expo-speech-recognition) for all tiers — voice input always has a working,
+ * offline-capable path.
  *
- * Native modules are imported lazily so the engine-selection policy stays
- * importable in non-RN contexts. The Groq API key is reused from the AI router's
- * secure provider config (no separate key).
+ * To re-enable cloud Whisper, add a dedicated audio-transcription endpoint to the
+ * proxy (it streams chat completions today, not audio) and switch resolveEngine()
+ * back to the tiered policy in sttPolicy.ts. The pure policy + endpoint constants
+ * are intentionally kept there for that follow-up.
+ *
+ * Native modules are imported lazily so this module stays importable in non-RN
+ * contexts.
  */
-import { getApiKey } from '@/ai/providerConfig';
-import { getNetworkTier } from '@/ai/networkTier';
-
-import {
-  GROQ_WHISPER_MODEL,
-  GROQ_WHISPER_URL,
-  type STTEngine,
-  selectSTTEngine,
-} from './sttPolicy';
+import type { STTEngine } from './sttPolicy';
 
 export interface STTResult {
   text: string;
@@ -32,7 +31,6 @@ export interface STTCallbacks {
 const DEFAULT_LANG = 'fil-PH';
 
 let currentEngine: STTEngine | null = null;
-let recordingHandle: { stopAndUnloadAsync: () => Promise<void>; getURI: () => string | null } | null = null;
 let nativeStop: (() => Promise<STTResult>) | null = null;
 
 /** Whether a listening session is currently active. */
@@ -40,16 +38,15 @@ export function isListening(): boolean {
   return currentEngine != null;
 }
 
-/** Decide which engine to use right now (tier + key availability). */
+/**
+ * Resolve the STT engine. The client always uses the native recognizer now that
+ * the Groq Whisper key lives only on the server proxy (see module header).
+ */
 export async function resolveEngine(): Promise<STTEngine> {
-  const [tier, groqKey] = await Promise.all([getNetworkTier(), getApiKey('groq')]);
-  return selectSTTEngine(tier, Boolean(groqKey));
+  return 'native';
 }
 
-/**
- * Begin a listening session. For Groq this starts an audio recording; for the
- * native engine it starts live recognition (with optional partial results).
- */
+/** Begin a native live-recognition session (with optional partial results). */
 export async function startListening(
   options: { lang?: string } & STTCallbacks = {},
 ): Promise<STTEngine> {
@@ -60,11 +57,7 @@ export async function startListening(
   currentEngine = await resolveEngine();
 
   try {
-    if (currentEngine === 'groq') {
-      await startGroqRecording();
-    } else {
-      await startNativeRecognition(lang, options);
-    }
+    await startNativeRecognition(lang, options);
   } catch (err) {
     currentEngine = null;
     throw err;
@@ -80,69 +73,11 @@ export async function stopListening(): Promise<STTResult> {
   }
 
   try {
-    if (engine === 'native') {
-      const result = nativeStop ? await nativeStop() : { text: '', engine };
-      return result;
-    }
-    const uri = await stopGroqRecording();
-    const text = uri ? await transcribeWithGroq(uri, DEFAULT_LANG) : '';
-    return { text, engine };
+    return nativeStop ? await nativeStop() : { text: '', engine };
   } finally {
     currentEngine = null;
     nativeStop = null;
-    recordingHandle = null;
   }
-}
-
-// --- Groq (record + upload) ------------------------------------------------
-
-async function startGroqRecording(): Promise<void> {
-  const { Audio } = await import('expo-av');
-  const permission = await Audio.requestPermissionsAsync();
-  if (!permission.granted) {
-    throw new Error('Microphone permission denied.');
-  }
-  await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-  const { recording } = await Audio.Recording.createAsync(
-    Audio.RecordingOptionsPresets.HIGH_QUALITY,
-  );
-  recordingHandle = recording;
-}
-
-async function stopGroqRecording(): Promise<string | null> {
-  if (!recordingHandle) {
-    return null;
-  }
-  await recordingHandle.stopAndUnloadAsync();
-  return recordingHandle.getURI();
-}
-
-/** Upload a recorded audio file to Groq Whisper and return the transcript. */
-export async function transcribeWithGroq(uri: string, lang: string = DEFAULT_LANG): Promise<string> {
-  const apiKey = await getApiKey('groq');
-  if (!apiKey) {
-    throw new Error('Groq API key not configured.');
-  }
-
-  const form = new FormData();
-  // React Native FormData file shape:
-  form.append('file', { uri, name: 'speech.m4a', type: 'audio/m4a' } as unknown as Blob);
-  form.append('model', GROQ_WHISPER_MODEL);
-  form.append('language', lang.split('-')[0]);
-  form.append('response_format', 'json');
-
-  const response = await fetch(GROQ_WHISPER_URL, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`Groq Whisper failed: HTTP ${response.status} ${detail}`.trim());
-  }
-  const json = (await response.json()) as { text?: string };
-  return (json.text ?? '').trim();
 }
 
 // --- Native OS recognition -------------------------------------------------

@@ -1,15 +1,18 @@
 /**
- * Reusable SSE streaming client for OpenAI-compatible chat completions.
+ * Cloud AI client — streams completions from the Suri server proxy.
  *
- * One implementation serves all three providers — only baseURL/apiKey/model
- * differ. Bytes are read from the streaming response, decoded, and fed through
- * the pure SSEStreamParser to emit tokens as they arrive.
+ * The proxy (supabase/functions/suri-ai-proxy) holds the provider keys and runs
+ * the Gemini → Groq → OpenRouter failover cascade. The client's job is now tiny:
+ * open ONE Server-Sent-Events stream to the proxy, send the messages (the system
+ * prompt already carries the MELC RAG context), and emit tokens as they arrive.
+ * No API keys, no client-side provider cascade.
  *
  * The fetch implementation is injectable. The default is Expo's streaming-capable
  * fetch (`expo/fetch`), loaded lazily so this module imports cleanly outside a
- * React Native runtime (e.g. for headless verification with a mock fetch).
+ * React Native runtime (e.g. headless verification with a mock fetch).
  */
 import { SSEStreamParser } from './sse';
+import { getProxyConfig } from './providerConfig';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -41,10 +44,7 @@ export interface StreamResponseLike {
     | null;
 }
 
-export interface StreamChatOptions {
-  baseURL: string;
-  apiKey: string;
-  model: string;
+export interface StreamProxyOptions {
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -52,40 +52,52 @@ export interface StreamChatOptions {
   signal?: AbortSignal;
   /** Abort if the request stalls this long (ms). Default 20s. */
   timeoutMs?: number;
-  extraHeaders?: Record<string, string>;
   /** Override the fetch implementation (default: expo/fetch). */
   fetchImpl?: FetchLike;
 }
 
-/** HTTP-level provider error carrying the status so the cascade can react. */
-export class ProviderHttpError extends Error {
+/** HTTP-level error from the proxy (carries the status for the caller). */
+export class ProxyHttpError extends Error {
   status: number;
 
   constructor(status: number, message: string) {
     super(message);
-    this.name = 'ProviderHttpError';
+    this.name = 'ProxyHttpError';
     this.status = status;
   }
 }
 
+/** Thrown when EXPO_PUBLIC_PROXY_URL / _TOKEN are not set in this build. */
+export class ProxyNotConfiguredError extends Error {
+  constructor() {
+    super(
+      'Cloud proxy not configured: set EXPO_PUBLIC_PROXY_URL and EXPO_PUBLIC_PROXY_TOKEN.',
+    );
+    this.name = 'ProxyNotConfiguredError';
+  }
+}
+
 /**
- * Stream a chat completion, invoking onToken for each delta and resolving with
- * the full concatenated text. Throws ProviderHttpError on non-2xx so the router
- * can fail over to the next provider.
+ * Stream a chat completion from the proxy, invoking onToken for each delta and
+ * resolving with the full concatenated text.
+ *
+ * @throws ProxyNotConfiguredError when the proxy URL/token are missing.
+ * @throws ProxyHttpError on a non-2xx response (so callers can degrade offline).
  */
-export async function streamChatCompletion(options: StreamChatOptions): Promise<string> {
+export async function streamProxyResponse(options: StreamProxyOptions): Promise<string> {
   const {
-    baseURL,
-    apiKey,
-    model,
     messages,
-    maxTokens = 800,
-    temperature = 0.4,
+    maxTokens,
+    temperature,
     onToken,
     signal,
     timeoutMs = 20000,
-    extraHeaders,
   } = options;
+
+  const config = getProxyConfig();
+  if (!config) {
+    throw new ProxyNotConfiguredError();
+  }
 
   const fetchImpl = options.fetchImpl ?? (await resolveDefaultFetch());
 
@@ -101,16 +113,16 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetchImpl(`${baseURL}/chat/completions`, {
+    const response = await fetchImpl(config.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
-        Authorization: `Bearer ${apiKey}`,
-        ...(extraHeaders ?? {}),
+        // Supabase gateway wants both; for a custom proxy either is fine.
+        Authorization: `Bearer ${config.token}`,
+        apikey: config.token,
       },
       body: JSON.stringify({
-        model,
         messages,
         stream: true,
         max_tokens: maxTokens,
@@ -126,13 +138,13 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
       } catch {
         // ignore secondary failure reading the error body
       }
-      throw new ProviderHttpError(
+      throw new ProxyHttpError(
         response.status,
-        `HTTP ${response.status} ${response.statusText ?? ''} ${truncate(detail)}`.trim(),
+        `Proxy HTTP ${response.status} ${response.statusText ?? ''} ${truncate(detail)}`.trim(),
       );
     }
     if (!response.body) {
-      throw new Error('Streaming not supported: response body is null.');
+      throw new Error('Streaming not supported: proxy response body is null.');
     }
 
     const reader = response.body.getReader();

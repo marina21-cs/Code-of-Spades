@@ -82,6 +82,15 @@ An animated fox companion lives in the app header. She has two states:
 - **Idle** — gentle breathing loop when you're reading
 - **Thinking** — ear-perk + tail-wag while the AI generates a response
 
+### 🤝 Kasabay Mode — Study Together, Never Alone
+
+Open the app and Suri is already at her desk, studying *with* you. **Kasabay Mode** is virtual **body doubling** — a focus technique validated for learners with ADHD (RA 11650) — that turns the dashboard into a shared study desk instead of a blank chat box.
+
+- **Tambayan UI** — high-contrast dark canvas (battery-friendly on OLED) framed with neon teal and electric lime accents
+- **Pixel-art Suri** — she flips pages, taps her pencil, and sips a drink while you work on paper, so you never feel like you're studying alone
+- **Interrupt anytime** — pause your focus timer with a tap ("Stuck ka ba?") and Suri looks up from her textbook to help, then offers to resume
+- **Low-Motion friendly** — switches to a gentle static image when the Low Motion accessibility setting is on
+
 ---
 
 ## Architecture
@@ -199,7 +208,7 @@ npx expo run:ios
 
 ## 📊 Progress Map
 
-> **Overall Progress: `█░░░░░░░░░░░░░░░░░░░` 5%**
+> **Overall Progress: `████████████░░░░░░░░` ~60%** — backend logic is strong (now including Misconception Detection, Kasabay Mode, and OCR ingestion); the UI layer has not been started.
 
 ### Current Sprint Status
 
@@ -207,16 +216,21 @@ npx expo run:ios
 |---|---|---|---|
 | 🗄️ Repository Setup | ✅ Done | ██████████ 100% | Git init, remote config, initial push |
 | 📄 Project Documentation | ✅ Done | ██████████ 100% | README, specs, project structure |
-| 🏗 App Shell & Navigation | 🔲 Not Started | ░░░░░░░░░░ 0% | Expo init, tab navigation, routing |
-| 🧠 Hybrid AI Router | 🔲 Not Started | ░░░░░░░░░░ 0% | Net detection, tier switching logic |
-| ☁️ Cloud AI Integration | 🔲 Not Started | ░░░░░░░░░░ 0% | Gemini / Groq / DeepSeek streaming |
-| 📱 On-Device SLM | 🔲 Not Started | ░░░░░░░░░░ 0% | llama.rn setup, model loading |
-| 📚 Local RAG (DepEd MELCs) | 🔲 Not Started | ░░░░░░░░░░ 0% | SQLite vector store, MELC data |
-| 🎨 Learning Profile Quiz | 🔲 Not Started | ░░░░░░░░░░ 0% | Onboarding flow, profile storage |
-| 🖼 Visual Generation (SVG) | 🔲 Not Started | ░░░░░░░░░░ 0% | LLM JSON → SVG diagrams |
-| ♿ Accessibility Features | 🔲 Not Started | ░░░░░░░░░░ 0% | OpenDyslexic, high contrast, TTS |
-| 🦊 Suri Mascot Animation | 🔲 Not Started | ░░░░░░░░░░ 0% | Idle & thinking states |
-| 🧪 Testing & QA | 🔲 Not Started | ░░░░░░░░░░ 0% | Offline fallback, provider cascade |
+| 🏗 App Shell & Navigation | 🟡 In Progress | ██░░░░░░░░ 20% | Root layout only, no screens |
+| 🧠 Hybrid AI Router | 🟡 In Progress | █████████░ 90% | 3-tier cascade logic complete |
+| ☁️ Cloud AI Integration | 🟡 In Progress | ████████░░ 85% | SSE streaming + provider cascade |
+| 📱 On-Device SLM | 🟡 In Progress | ███████░░░ 75% | llama.rn wired, not device-tested |
+| 📚 Local RAG (DepEd MELCs) | 🟡 In Progress | ██████░░░░ 60% | SQLite store live, lexical embeddings |
+| 🎨 Learning Profile Quiz | 🟡 In Progress | █████░░░░░ 55% | Profile/prompt done, quiz UI missing |
+| 🖼 Visual Generation (SVG) | 🟡 In Progress | ████░░░░░░ 40% | Parser done, no SVG renderer |
+| ♿ Accessibility Features | 🟡 In Progress | ████░░░░░░ 45% | TTS works, no font/contrast UI |
+| 🦊 Suri Mascot Animation | 🔲 Not Started | ░░░░░░░░░░ 0% | No code, dependency missing |
+| 🩺 Misconception Detection | 🟡 In Progress | ███████░░░ 70% | Detector + taxonomy + prompt + Kwento wiring done (verified); no UI |
+| 📷 Camera OCR (Worksheets) | 🟡 In Progress | █████░░░░░ 55% | Clean + chunk + ingest to personal RAG done (verified); native ML Kit recognizer not wired |
+| 🤝 Kasabay Mode (Body Doubling) | 🟡 In Progress | ███████░░░ 70% | Focus timer + persona prompt + interruption logic done (verified); no UI |
+| 🧪 Testing & QA | 🟡 In Progress | █████░░░░░ 45% | 12 headless verifiers pass, no test framework |
+| 🎮 Gamification & Economy | 🟡 In Progress | ████████░░ 85% | Economy + streak logic, no UI |
+| 📡 B2B Telemetry Sync | 🟡 In Progress | █████░░░░░ 55% | Local queue works, sync stubbed |
 
 ### Legend
 

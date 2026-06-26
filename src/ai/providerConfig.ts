@@ -1,88 +1,71 @@
 /**
- * Cloud provider configuration + secure API-key storage.
+ * Cloud AI access configuration — SERVER-PROXY model.
  *
- * All three providers expose the SAME OpenAI-compatible chat-completions API,
- * so they differ only by base URL, model id, and key (spec 5.2 / 10). Keys live
- * in expo-secure-store (encrypted at rest) and can be rotated without an app
- * update. Keys are NEVER hardcoded or logged.
+ * The client no longer holds ANY LLM provider keys. The real Gemini / Groq /
+ * OpenRouter keys and the failover cascade live in the Supabase Edge Function
+ * (supabase/functions/suri-ai-proxy). All the client needs is:
+ *
+ *   EXPO_PUBLIC_PROXY_URL    — the deployed Edge Function URL
+ *   EXPO_PUBLIC_PROXY_TOKEN  — the access token sent with every request
+ *                              (the Supabase anon key, or a shared secret)
+ *
+ * ── SECURITY MODEL ───────────────────────────────────────────────────────────
+ * `EXPO_PUBLIC_*` values are still inlined into the JS bundle, so this token IS
+ * visible in the APK. That is acceptable: the Supabase anon key is PUBLIC by
+ * design, and this token only gates access to the proxy (basic abuse control) —
+ * it grants NO direct provider access. The valuable, billable provider keys are
+ * now server-side only. For stronger abuse protection add per-user auth (a real
+ * Supabase Auth JWT) and rate limiting at the proxy.
+ *
+ * Env vars are read through STATIC `process.env.EXPO_PUBLIC_*` member accesses
+ * (inside the accessor) so Metro inlines them at build time. Pure module — no
+ * native imports — so the router and its headless verification load cleanly.
  */
-import * as SecureStore from 'expo-secure-store';
 
-export type ProviderId = 'gemini' | 'groq' | 'openrouter';
-
-export interface ProviderConfig {
-  id: ProviderId;
-  label: string;
-  /** OpenAI-compatible base URL; client appends /chat/completions. */
-  baseURL: string;
-  /** Default model id for this provider. */
-  model: string;
-  /** expo-secure-store key under which the API key is stored. */
-  apiKeyName: string;
-  /** Documented free-tier limits (informational; June 2026). */
-  limits: { rpm: number; rpd: number };
+export interface ProxyConfig {
+  /** Fully-qualified Edge Function URL. */
+  url: string;
+  /** Bearer/apikey token sent on every request (anon key or shared secret). */
+  token: string;
 }
 
-export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
-  gemini: {
-    id: 'gemini',
-    label: 'Gemini 3 Flash',
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-3-flash',
-    apiKeyName: 'suri.apikey.gemini',
-    limits: { rpm: 10, rpd: 1500 },
-  },
-  groq: {
-    id: 'groq',
-    label: 'Groq Llama 3.1 8B Instant',
-    baseURL: 'https://api.groq.com/openai/v1',
-    model: 'llama-3.1-8b-instant',
-    apiKeyName: 'suri.apikey.groq',
-    limits: { rpm: 30, rpd: 14400 },
-  },
-  openrouter: {
-    id: 'openrouter',
-    label: 'OpenRouter DeepSeek V3',
-    baseURL: 'https://openrouter.ai/api/v1',
-    model: 'deepseek/deepseek-v3-0324:free',
-    apiKeyName: 'suri.apikey.openrouter',
-    limits: { rpm: 20, rpd: 200 },
-  },
-};
-
-/** Failover order: primary -> fallback 1 -> fallback 2. */
-export const PROVIDER_CASCADE: ProviderId[] = ['gemini', 'groq', 'openrouter'];
-
-/** Persist an API key for a provider. Trimmed; empty input clears the key. */
-export async function setApiKey(provider: ProviderId, key: string): Promise<void> {
-  const trimmed = key.trim();
-  if (!trimmed) {
-    await clearApiKey(provider);
-    return;
+/** Trim and treat empty strings as absent. */
+function normalize(value: string | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
   }
-  await SecureStore.setItemAsync(PROVIDERS[provider].apiKeyName, trimmed);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
-/** Read a stored API key, or null if none is set. */
-export async function getApiKey(provider: ProviderId): Promise<string | null> {
-  return SecureStore.getItemAsync(PROVIDERS[provider].apiKeyName);
-}
-
-/** Remove a stored API key. */
-export async function clearApiKey(provider: ProviderId): Promise<void> {
-  await SecureStore.deleteItemAsync(PROVIDERS[provider].apiKeyName);
-}
-
-/** Providers that currently have a key, in cascade order. */
-export async function getConfiguredProviders(): Promise<ProviderId[]> {
-  const configured: ProviderId[] = [];
-  for (const id of PROVIDER_CASCADE) {
-    // Sequential on purpose: SecureStore reads are cheap and ordering matters.
-    // eslint-disable-next-line no-await-in-loop
-    const key = await getApiKey(id);
-    if (key) {
-      configured.push(id);
-    }
+/**
+ * Resolve the proxy endpoint + token, or null if either is missing. Read lazily
+ * (still statically inlined by Metro) so the value can be provided at runtime in
+ * tests and so the app degrades gracefully when unconfigured.
+ */
+export function getProxyConfig(): ProxyConfig | null {
+  const url = normalize(process.env.EXPO_PUBLIC_PROXY_URL);
+  const token = normalize(process.env.EXPO_PUBLIC_PROXY_TOKEN);
+  if (!url || !token) {
+    return null;
   }
-  return configured;
+  return { url, token };
+}
+
+/** Whether the cloud proxy is configured in this build. */
+export function isProxyConfigured(): boolean {
+  return getProxyConfig() !== null;
+}
+
+// Development-time nudge (never crashes; no-op in production and under the
+// headless Node verifiers, where __DEV__ is undefined). Suri stays usable
+// without the proxy via cached answers + the on-device SLM.
+if (typeof __DEV__ !== "undefined" && __DEV__) {
+  if (!isProxyConfigured()) {
+    console.warn(
+      "[Suri] Cloud proxy not configured. Set EXPO_PUBLIC_PROXY_URL and " +
+        "EXPO_PUBLIC_PROXY_TOKEN to enable the online AI tiers. Offline cache " +
+        "and the on-device SLM still work.",
+    );
+  }
 }

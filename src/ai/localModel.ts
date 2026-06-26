@@ -39,10 +39,21 @@ export async function runLocalModel(params: LocalModelParams): Promise<string> {
   if (registeredRunner) {
     return registeredRunner(params);
   }
-  return extractiveFallback(params);
+  return runExtractiveFallback(params);
 }
 
-async function extractiveFallback(params: LocalModelParams): Promise<string> {
+/**
+ * Extractive grounding fallback: returns the top retrieved MELC passage as the
+ * answer (streamed word-by-word so the UI still sees a token stream), or an
+ * honest "offline, no local model" message when there is no grounding. It never
+ * fabricates content beyond the retrieved curriculum text.
+ *
+ * Exported and reusable so the offline SLM path can degrade to it cleanly when
+ * the on-device model hits an out-of-memory / load failure on a budget 2GB
+ * device (spec 10) instead of crashing the router. Behavior is identical to the
+ * original private fallback.
+ */
+export async function runExtractiveFallback(params: LocalModelParams): Promise<string> {
   const { user, ragChunks, onToken } = params;
   const top = ragChunks[0]?.trim();
 

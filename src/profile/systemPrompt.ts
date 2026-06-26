@@ -150,17 +150,34 @@ function ragSection(ragChunks: string[]): string {
 }
 
 /**
+ * Distinct LANGUAGE directive per language preference (spec 5.8). Each value
+ * yields a meaningfully different instruction, so the same profile rendered in
+ * a different language produces a different system prompt.
+ */
+function languageDirective(language: LearningProfile['languagePreference']): string {
+  switch (language) {
+    case 'tagalog':
+      return 'LANGUAGE: Respond entirely in Tagalog (Filipino). Use English only for unavoidable technical terms, and briefly gloss them in Filipino.';
+    case 'taglish':
+      return 'LANGUAGE: Respond in natural Taglish — conversational Filipino that code-switches with English for technical terms, the way many Filipino students actually speak.';
+    case 'english':
+      return 'LANGUAGE: Respond in clear, simple English suited to a Filipino learner; you may briefly clarify a difficult term in Filipino when it helps.';
+  }
+}
+
+/**
  * Build the full system prompt for a single inference.
  *
  * @param profile   the student's learning profile (mode + accessibility + grade)
  * @param ragChunks top-k retrieved MELC passages (may be empty offline)
  */
 export function buildSystemPrompt(profile: LearningProfile, ragChunks: string[] = []): string {
-  const { responseMode, accessibilitySettings, gradeLevel } = profile;
+  const { responseMode, accessibilitySettings, gradeLevel, languagePreference } = profile;
 
   const sections = [
     PERSONA,
     gradeGuidance(gradeLevel),
+    languageDirective(languagePreference),
     MODE_INSTRUCTIONS[responseMode],
     formattingContract(responseMode),
     accessibilityDirectives(accessibilitySettings),

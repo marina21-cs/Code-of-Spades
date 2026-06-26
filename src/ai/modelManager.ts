@@ -81,7 +81,7 @@ export async function hasEnoughStorage(): Promise<boolean> {
 
 /** Fast check: file exists with an acceptable size. Does not hash. */
 export async function isModelDownloaded(): Promise<boolean> {
-  const info = await FileSystem.getInfoAsync(getModelPath(), { size: true });
+  const info = await FileSystem.getInfoAsync(getModelPath());
   if (!info.exists || info.isDirectory) {
     return false;
   }
@@ -183,7 +183,7 @@ export async function resumeDownload(
 
 /** Verify the on-disk model by size and (if configured) SHA-256. */
 export async function verifyModelIntegrity(): Promise<ModelIntegrity> {
-  const info = await FileSystem.getInfoAsync(getModelPath(), { size: true });
+  const info = await FileSystem.getInfoAsync(getModelPath());
   if (!info.exists || info.isDirectory) {
     return { ok: false, exists: false, sizeOk: false, checksumOk: null };
   }

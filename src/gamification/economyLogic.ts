@@ -1,101 +1,122 @@
 /**
  * Pure gamification economy + adaptive-difficulty logic (spec 5.9).
  *
- * No DB, no native imports (only an erased `import type`) → deterministic and
- * unit-testable headlessly. resourceService.ts persists the results; this module
- * only computes them.
+ * No DB and no runtime imports (only an erased `import type`), so every function
+ * here is deterministic and headlessly unit-testable. resourceService.ts
+ * persists the results; this module only computes them.
  *
- * Reward randomness is INJECTED via an `rng` argument so tests are reproducible;
- * production callers omit it and get Math.random.
+ * Randomness is INJECTED via an optional `rng` argument so tests are
+ * reproducible. Production callers pass two arguments and get Math.random; the
+ * declared 2-argument signature is preserved.
  */
 import type { CompetencyEventType } from '@/telemetry/types';
 
-export interface ReviewResult {
-  wasCorrect: boolean;
-  /** Difficulty (1..5) of the item the student just answered. */
-  difficulty: number;
-}
+/** The four resource kinds in the Stardew-style economy. */
+export type ResourceType = 'seed' | 'wood' | 'tool' | 'coin';
 
+/** A single resource award produced by a review. */
 export interface ResourceDrop {
-  resourceType: string;
-  quantity: number;
+  type: ResourceType;
+  amount: number;
 }
 
-export interface DifficultyState {
-  competencyCode: string;
+/** Player progression derived from cumulative XP. */
+export interface LevelInfo {
+  level: number;
+  worldStage: number;
+}
+
+/** Result of folding one review outcome into a competency's mastery. */
+export interface MasteryUpdate {
   /** Rolling comprehension estimate in [0, 1]. */
-  mastery: number;
-  /** Current item difficulty, clamped to [1, 5]. */
-  difficulty: number;
-  /** Reward drop probability in [0.2, 1]; higher for struggling students. */
+  newMastery: number;
+  /** Reward drop probability in [0, 1] for the next review. */
   dropRate: number;
 }
 
-/** Clamp a value into [min, max]. */
+/** Clamp `value` into the inclusive range [min, max]. */
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Default per-competency difficulty (mirrors the difficulty_state DDL defaults). */
-export function initialDifficulty(competencyCode: string): DifficultyState {
-  return { competencyCode, mastery: 0, difficulty: 2, dropRate: 0.5 };
-}
-
 /**
- * Resources earned for a review outcome.
- *  - Correct: 1 `seed` + `difficulty` `coin`s, plus a rare `tool` bonus dropped
- *    with probability `dropRate`.
- *  - Incorrect: a single consolation `seed` so struggling students still progress.
+ * Randomized resource drops for a review, in the spirit of a Stardew Valley
+ * harvest. Output is HEAVILY influenced by `dropRate`:
+ *  - `seed`  — always awarded (participation); count grows with mastery.
+ *  - `wood`  — common; its roll is nudged up by dropRate.
+ *  - `coin`  — the skill reward; amount scales with mastery, gated by dropRate.
+ *  - `tool`  — the rare drop; gated by dropRate squared, so it is scarce and
+ *              becomes far scarcer once dropRate is reduced for mastered topics.
+ *
+ * `rng` is injectable for deterministic tests; it defaults to Math.random.
  */
 export function resourceDropsFor(
-  result: ReviewResult,
+  masteryLevel: number,
   dropRate: number,
   rng: () => number = Math.random,
 ): ResourceDrop[] {
-  if (!result.wasCorrect) {
-    return [{ resourceType: 'seed', quantity: 1 }];
+  const mastery = clamp(masteryLevel, 0, 1);
+  const rate = clamp(dropRate, 0, 1);
+  const drops: ResourceDrop[] = [];
+
+  // Common participation reward — always at least one seed, more with mastery.
+  drops.push({ type: 'seed', amount: 1 + Math.floor(mastery * 2) });
+
+  // Wood is common but still a roll, so harvests vary review-to-review.
+  if (rng() < 0.5 + rate * 0.3) {
+    drops.push({ type: 'wood', amount: 1 + Math.round(mastery * 2) });
   }
-  const drops: ResourceDrop[] = [
-    { resourceType: 'seed', quantity: 1 },
-    { resourceType: 'coin', quantity: Math.max(1, Math.round(result.difficulty)) },
-  ];
-  if (rng() < clamp(dropRate, 0, 1)) {
-    drops.push({ resourceType: 'tool', quantity: 1 });
+
+  // Coins are the skill payout: amount scales with mastery, gated by dropRate.
+  if (rng() < rate) {
+    drops.push({ type: 'coin', amount: Math.max(1, Math.round(1 + mastery * 4)) });
   }
+
+  // Tools are the rare drop, heavily gated by dropRate (squared => scarce).
+  if (rng() < rate * rate) {
+    drops.push({ type: 'tool', amount: 1 });
+  }
+
   return drops;
 }
 
-/** XP awarded for a review: scales with difficulty when correct, flat when wrong. */
-export function xpForResult(wasCorrect: boolean, difficulty: number): number {
-  return wasCorrect ? 10 + Math.max(1, Math.round(difficulty)) * 5 : 5;
-}
-
 /**
- * Player level + world stage from cumulative XP.
- * 100 XP per level; a new world stage every 5 levels.
+ * Player level + world stage from cumulative XP on a scaling (square-root)
+ * curve: `level = floor(sqrt(xp / 100))`, floored at 1 so a fresh player is
+ * level 1 (matching the seeded player_state). The curve means each level costs
+ * progressively more XP. A new world stage unlocks every 5 levels.
  */
-export function levelForXp(xp: number): { level: number; worldStage: number } {
-  const safeXp = Math.max(0, Math.floor(xp));
-  const level = Math.floor(safeXp / 100) + 1;
-  const worldStage = Math.floor((level - 1) / 5);
+export function levelForXp(xp: number): LevelInfo {
+  const safeXp = Math.max(0, xp);
+  const level = Math.max(1, Math.floor(Math.sqrt(safeXp / 100)));
+  const worldStage = Math.floor(level / 5);
   return { level, worldStage };
 }
 
 /**
- * Next adaptive-difficulty state after a review.
- *  - mastery drifts up on correct (+0.1), down on incorrect (−0.15), clamped [0,1].
- *  - difficulty steps toward the student: +1 when correct, −1 when wrong, [1,5].
- *  - dropRate is higher for low mastery (more encouraging drops) and lower for
- *    high mastery (rarer rewards): 1 − 0.6·mastery, clamped [0.2, 1].
+ * Fold one review outcome into a competency's mastery using a rolling weighted
+ * average: `newMastery = prevMastery * 0.7 + (wasCorrect ? 0.3 : 0)`.
+ *
+ * The reward drop-rate falls as mastery climbs, and once a competency is
+ * mastered (mastery > 0.8) the rate is sharply reduced so rare resources become
+ * much harder to earn from material the student already knows.
  */
-export function nextDifficulty(prev: DifficultyState, wasCorrect: boolean): DifficultyState {
-  const mastery = clamp(prev.mastery + (wasCorrect ? 0.1 : -0.15), 0, 1);
-  const difficulty = clamp(prev.difficulty + (wasCorrect ? 1 : -1), 1, 5);
-  const dropRate = clamp(1 - mastery * 0.6, 0.2, 1);
-  return { competencyCode: prev.competencyCode, mastery, difficulty, dropRate };
+export function nextDifficulty(prevMastery: number, wasCorrect: boolean): MasteryUpdate {
+  const newMastery = clamp(clamp(prevMastery, 0, 1) * 0.7 + (wasCorrect ? 0.3 : 0), 0, 1);
+  const dropRate = newMastery > 0.8 ? 0.15 : clamp(0.6 - newMastery * 0.4, 0.2, 0.6);
+  return { newMastery, dropRate };
 }
 
-/** Classify a review outcome into a telemetry event type. */
+/**
+ * XP awarded for a review. Correct answers are worth more; an incorrect answer
+ * still grants a little so effort always advances the world. Supports the
+ * player_state XP update in resourceService.
+ */
+export function xpForResult(wasCorrect: boolean): number {
+  return wasCorrect ? 20 : 5;
+}
+
+/** Classify a review outcome into a B2B telemetry event type. */
 export function eventTypeFor(wasCorrect: boolean, mastery: number): CompetencyEventType {
   if (!wasCorrect) {
     return 'missed';

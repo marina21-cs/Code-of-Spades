@@ -3,12 +3,12 @@
  *
  * WHY THIS EXISTS:
  *   eventQueue.ts depends on expo-sqlite (native, device only), so it can't be
- *   imported in plain Node. This script replays the SAME SQL — recordQuizAttempt,
- *   enqueueCompetencyEvent, getUnsyncedEvents, markSynced — against Node's
- *   built-in node:sqlite using the REAL table DDL (schema.ts). It validates
- *   insertion, the unsynced filter + oldest-first ordering, the payload JSON
- *   round-trip, nullable is_correct, the LIMIT, and that markSynced removes rows
- *   from the unsynced set. The event_type CHECK constraint is exercised too.
+ *   imported in plain Node. This script replays the SAME SQL — enqueueCompetencyEvent,
+ *   getUnsyncedEvents, markSynced, and recordQuizAttempt — against Node's built-in
+ *   node:sqlite using the REAL table DDL (schema.ts). It validates insertion, the
+ *   unsynced filter + oldest-first ordering, the payload round-trip, is_correct
+ *   coercion, the LIMIT, and that markSynced removes rows from the unsynced set.
+ *   The event_type CHECK constraint is exercised too.
  *
  *   It does NOT exercise the expo-sqlite binding itself — that runs on-device.
  *
@@ -32,34 +32,13 @@ const db = new DatabaseSync(':memory:');
 db.exec(CREATE_TABLES_SQL);
 
 // --- reproduce eventQueue.ts against node:sqlite --------------------------
-function recordQuizAttempt(a) {
+function enqueueCompetencyEvent(event) {
   const r = db
     .prepare(
-      `INSERT INTO quiz_attempts
-         (subject, grade_level, competency_code, question, student_answer, is_correct)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO competency_events (event_type, competency_code, is_correct, payload, created_at, synced_at)
+       VALUES (?, ?, ?, ?, datetime('now'), NULL)`,
     )
-    .run(
-      a.subject ?? null,
-      a.gradeLevel ?? null,
-      a.competencyCode ?? null,
-      a.question,
-      a.studentAnswer ?? null,
-      a.isCorrect ? 1 : 0,
-    );
-  return Number(r.lastInsertRowid);
-}
-
-function enqueueCompetencyEvent(e) {
-  const payload = e.payload != null ? JSON.stringify(e.payload) : null;
-  const isCorrect = e.isCorrect == null ? null : e.isCorrect ? 1 : 0;
-  const r = db
-    .prepare(
-      `INSERT INTO competency_events
-         (event_type, competency_code, subject, grade_level, is_correct, payload)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(e.eventType, e.competencyCode ?? null, e.subject ?? null, e.gradeLevel ?? null, isCorrect, payload);
+    .run(event.event_type, event.competency_code, event.is_correct ? 1 : 0, event.payload);
   return Number(r.lastInsertRowid);
 }
 
@@ -81,52 +60,56 @@ function markSynced(ids) {
   db.prepare(`UPDATE competency_events SET synced_at = datetime('now') WHERE id IN (${placeholders})`).run(...ids);
 }
 
-// --- assertions -----------------------------------------------------------
-// 1. quiz_attempts insertion (the closed write gap)
-const qid = recordQuizAttempt({
-  question: 'What are the parts of a plant cell?',
-  isCorrect: true,
-  competencyCode: 'S6LT-IIe-f-3',
-  subject: 'Science',
-  gradeLevel: 6,
-  studentAnswer: 'cell wall, nucleus, chloroplast',
-});
-check(qid > 0, `recordQuizAttempt returns a row id (${qid})`);
-const qrow = db.prepare('SELECT * FROM quiz_attempts WHERE id = ?').get(qid);
-check(
-  qrow.is_correct === 1 && qrow.competency_code === 'S6LT-IIe-f-3' && qrow.grade_level === 6,
-  'quiz_attempts row persisted with the correct fields',
-);
+function recordQuizAttempt(a) {
+  const r = db
+    .prepare(
+      `INSERT INTO quiz_attempts
+         (subject, grade_level, competency_code, question, student_answer, is_correct)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      a.subject ?? null,
+      a.gradeLevel ?? null,
+      a.competencyCode ?? null,
+      a.question,
+      a.studentAnswer ?? null,
+      a.isCorrect ? 1 : 0,
+    );
+  return Number(r.lastInsertRowid);
+}
 
-// 2. enqueue two events
+// --- assertions -----------------------------------------------------------
+// 1. enqueue two events using the new { event_type, competency_code, is_correct, payload } shape
 const e1 = enqueueCompetencyEvent({
-  eventType: 'reviewed',
-  competencyCode: 'S6LT-IIe-f-3',
-  subject: 'Science',
-  gradeLevel: 6,
-  isCorrect: true,
-  payload: { difficulty: 3, mastery: 0.4 },
+  event_type: 'reviewed',
+  competency_code: 'S6LT-IIe-f-3',
+  is_correct: true,
+  payload: JSON.stringify({ difficulty: 3, mastery: 0.4 }),
 });
 const e2 = enqueueCompetencyEvent({
-  eventType: 'missed',
-  competencyCode: 'S6MT-Ig-h-4',
-  subject: 'Science',
-  gradeLevel: 6,
-  isCorrect: false,
+  event_type: 'missed',
+  competency_code: 'S6MT-Ig-h-4',
+  is_correct: false,
+  payload: JSON.stringify({ difficulty: 2 }),
 });
 check(e1 > 0 && e2 > e1, `two events enqueued with increasing ids (${e1}, ${e2})`);
+
+// 2. rows persist with a created_at timestamp and a NULL synced_at
+const row1 = db.prepare('SELECT * FROM competency_events WHERE id = ?').get(e1);
+check(row1.created_at != null, 'enqueued event is stamped with created_at');
+check(row1.synced_at === null, 'enqueued event starts with a NULL synced_at (pending)');
 
 // 3. unsynced retrieval + oldest-first ordering
 const unsynced = getUnsyncedEvents();
 check(unsynced.length === 2, `getUnsyncedEvents returns both pending rows (got ${unsynced.length})`);
 check(unsynced[0].id === e1, 'unsynced events are returned oldest-first');
 
-// 4. payload JSON round-trip
+// 4. payload JSON round-trip (payload is stored verbatim as a string)
 const parsed = JSON.parse(unsynced[0].payload);
 check(parsed.difficulty === 3 && parsed.mastery === 0.4, 'payload JSON round-trips losslessly');
 
-// 5. nullable is_correct stored as 0 for a missed event
-check(unsynced[1].is_correct === 0, 'missed event stored is_correct = 0');
+// 5. boolean is_correct is coerced to 0/1
+check(unsynced[0].is_correct === 1 && unsynced[1].is_correct === 0, 'is_correct stored as 1 (correct) / 0 (missed)');
 
 // 6. LIMIT is respected
 check(getUnsyncedEvents(1).length === 1, 'LIMIT caps the batch size');
@@ -135,8 +118,7 @@ check(getUnsyncedEvents(1).length === 1, 'LIMIT caps the batch size');
 markSynced([e1]);
 const afterSync = getUnsyncedEvents();
 check(afterSync.length === 1 && afterSync[0].id === e2, 'markSynced drops the synced event from the queue');
-const syncedRow = db.prepare('SELECT synced_at FROM competency_events WHERE id = ?').get(e1);
-check(syncedRow.synced_at != null, 'a synced event carries a synced_at timestamp');
+check(db.prepare('SELECT synced_at FROM competency_events WHERE id = ?').get(e1).synced_at != null, 'a synced event carries a synced_at timestamp');
 
 // 8. markSynced([]) is a safe no-op
 markSynced([]);
@@ -145,11 +127,23 @@ check(getUnsyncedEvents().length === 1, 'markSynced([]) is a safe no-op');
 // 9. event_type CHECK constraint rejects invalid values
 let rejected = false;
 try {
-  enqueueCompetencyEvent({ eventType: 'bogus' });
+  enqueueCompetencyEvent({ event_type: 'bogus', competency_code: 'X', is_correct: true, payload: '{}' });
 } catch {
   rejected = true;
 }
 check(rejected, 'competency_events.event_type CHECK rejects invalid values');
+
+// 10. recordQuizAttempt still writes the spaced-repetition log
+const qid = recordQuizAttempt({
+  question: 'What are the parts of a plant cell?',
+  isCorrect: true,
+  competencyCode: 'S6LT-IIe-f-3',
+  subject: 'Science',
+  gradeLevel: 6,
+  studentAnswer: 'cell wall, nucleus, chloroplast',
+});
+const qrow = db.prepare('SELECT * FROM quiz_attempts WHERE id = ?').get(qid);
+check(qid > 0 && qrow.is_correct === 1 && qrow.competency_code === 'S6LT-IIe-f-3', 'recordQuizAttempt persists an answered question');
 
 db.close();
 

@@ -7,16 +7,31 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
     "android": {
-      "package": "ph.suri.app"
+      "package": "ph.suri.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#fff8f5"
+      }
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ph.suri.app"
+      "bundleIdentifier": "ph.suri.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch", "processing"]
+      }
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Suri to use the camera to scan worksheets and textbook pages for offline study."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,26 +1,26 @@
 /**
  * Headless reactive controller for the Learning Profile.
  *
- * This is a logic-only hook (no JSX, no UI) that the application layer consumes
- * later to read and mutate the profile. It owns the async load/save lifecycle so
- * screens don't each reimplement it, and exposes a synchronous snapshot of the
- * current profile plus loading/first-run/error state.
+ * This is a logic-only hook (no JSX, no UI). It now reads from a single
+ * process-wide runtime (see profileRuntime.ts) via `useSyncExternalStore`, so
+ * EVERY consumer shares one profile object: toggling a setting in the Profile
+ * tab instantly re-renders Kasabay, Tanong, charts, etc. The public API is
+ * unchanged, so existing call sites keep working as-is.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import {
-  isFirstRun as readIsFirstRun,
-  loadProfile,
-  markFirstRunComplete,
-  resetProfile,
-  saveProfile,
-} from './profileStore';
-import {
-  type AccessibilitySettings,
-  DEFAULT_PROFILE,
-  type LearningProfile,
-  cloneProfile,
-} from './types';
+  applyAccessibility,
+  applyProfile,
+  applyUpdate,
+  completeFirstRunRuntime,
+  ensureLoaded,
+  getSnapshot,
+  reloadRuntime,
+  resetRuntime,
+  subscribe,
+} from './profileRuntime';
+import { type AccessibilitySettings, type LearningProfile } from './types';
 
 export interface UseProfileResult {
   /** Current profile. Seeded with defaults until the first load resolves. */
@@ -46,99 +46,31 @@ export interface UseProfileResult {
 }
 
 export function useProfile(): UseProfileResult {
-  const [profile, setProfile] = useState<LearningProfile>(() => cloneProfile(DEFAULT_PROFILE));
-  const [isLoading, setIsLoading] = useState(true);
-  const [firstRun, setFirstRun] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  // Avoid setState after unmount.
-  const mountedRef = useRef(true);
+  // Trigger the one-time load. `ensureLoaded` is idempotent across the app.
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    ensureLoaded();
   }, []);
 
-  const reload = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [loaded, first] = await Promise.all([loadProfile(), readIsFirstRun()]);
-      if (mountedRef.current) {
-        setProfile(loaded);
-        setFirstRun(first);
-        setError(null);
-      }
-    } catch (err) {
-      if (mountedRef.current) {
-        setError(err as Error);
-      }
-    } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  const save = useCallback(async (next: LearningProfile) => {
-    try {
-      await saveProfile(next);
-      if (mountedRef.current) {
-        setProfile(cloneProfile(next));
-        setError(null);
-      }
-    } catch (err) {
-      if (mountedRef.current) {
-        setError(err as Error);
-      }
-      throw err;
-    }
-  }, []);
-
+  const save = useCallback((next: LearningProfile) => applyProfile(next), []);
   const update = useCallback(
-    async (patch: Partial<Omit<LearningProfile, 'accessibilitySettings'>>) => {
-      const next: LearningProfile = { ...profile, ...patch };
-      await save(next);
-    },
-    [profile, save],
+    (patch: Partial<Omit<LearningProfile, 'accessibilitySettings'>>) => applyUpdate(patch),
+    [],
   );
-
   const updateAccessibility = useCallback(
-    async (patch: Partial<AccessibilitySettings>) => {
-      const next: LearningProfile = {
-        ...profile,
-        accessibilitySettings: { ...profile.accessibilitySettings, ...patch },
-      };
-      await save(next);
-    },
-    [profile, save],
+    (patch: Partial<AccessibilitySettings>) => applyAccessibility(patch),
+    [],
   );
-
-  const completeFirstRun = useCallback(async () => {
-    await markFirstRunComplete();
-    if (mountedRef.current) {
-      setFirstRun(false);
-    }
-  }, []);
-
-  const reset = useCallback(async () => {
-    await resetProfile();
-    if (mountedRef.current) {
-      setProfile(cloneProfile(DEFAULT_PROFILE));
-      setFirstRun(true);
-      setError(null);
-    }
-  }, []);
+  const completeFirstRun = useCallback(() => completeFirstRunRuntime(), []);
+  const reset = useCallback(() => resetRuntime(), []);
+  const reload = useCallback(() => reloadRuntime(), []);
 
   return {
-    profile,
-    isLoading,
-    isFirstRun: firstRun,
-    error,
+    profile: state.profile,
+    isLoading: state.isLoading,
+    isFirstRun: state.firstRun,
+    error: state.error,
     save,
     update,
     updateAccessibility,

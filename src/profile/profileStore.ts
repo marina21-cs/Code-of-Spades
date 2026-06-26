@@ -18,9 +18,32 @@ import type { LearningProfile } from './types';
 const PROFILE_KEY = 'suri.learning_profile';
 const FIRST_RUN_DONE_KEY = 'suri.first_run_complete';
 
+/**
+ * Synchronous pub/sub so reactive layers (e.g. SettingsProvider) can react the
+ * instant the persisted profile changes, regardless of which screen wrote it.
+ * Kept intentionally tiny and dependency-free.
+ */
+const profileListeners = new Set<() => void>();
+
+/** Subscribe to profile writes; returns an unsubscribe function. */
+export function subscribeProfileChange(listener: () => void): () => void {
+  profileListeners.add(listener);
+  return () => {
+    profileListeners.delete(listener);
+  };
+}
+
+/** Notify every subscriber that the persisted profile changed. */
+function emitProfileChange(): void {
+  for (const l of profileListeners) {
+    l();
+  }
+}
+
 /** Persist the full profile (normalized + serialized) to secure storage. */
 export async function saveProfile(profile: LearningProfile): Promise<void> {
   await SecureStore.setItemAsync(PROFILE_KEY, serializeProfile(profile));
+  emitProfileChange();
 }
 
 /**
@@ -60,4 +83,5 @@ export async function markFirstRunComplete(): Promise<void> {
 export async function resetProfile(): Promise<void> {
   await SecureStore.deleteItemAsync(PROFILE_KEY);
   await SecureStore.deleteItemAsync(FIRST_RUN_DONE_KEY);
+  emitProfileChange();
 }

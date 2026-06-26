@@ -2,57 +2,33 @@
  * Public AI router. Wires the real (native) collaborators into the pure
  * executeRoute() orchestration and exposes a single routeMessage() entry point.
  *
- * Streaming, network detection, retrieval, caching, the provider cascade, and
- * the offline SLM fallback all flow through here. With no API keys configured,
- * routing still succeeds by degrading to cache and then the on-device fallback.
+ * Streaming, network detection, retrieval, caching, the cloud path, and the
+ * offline SLM fallback all flow through here. The cloud path is now an ORDERED
+ * cascade of named providers — Gemini → Groq → OpenRouter — built client-side
+ * (see cloudCascade.buildCloudProviders), with the optional legacy server proxy
+ * appended last. With nothing configured, routing still succeeds by degrading to
+ * cache and then the on-device fallback.
  */
 import { buildSystemPrompt } from '@/profile/systemPrompt';
 import { retrieveTopK } from '@/db/ragStore';
 
-import { streamChatCompletion } from './cloudClient';
 import { getNetworkTier } from './networkTier';
 import { cacheResponse, getCachedResponse } from './responseCache';
 import { runLocalModel } from './localModel';
-import { PROVIDERS, PROVIDER_CASCADE, getApiKey } from './providerConfig';
+import { buildCloudProviders } from './cloudCascade';
 import { executeRoute } from './routerCore';
 import type { ProviderHandle, RouteDeps, RouteOptions, RouteResult } from './routerCore';
 
-/** Build streaming handles for every provider that currently has a key. */
+/**
+ * The cloud tier is now an ORDERED cascade of named providers — Gemini → Groq →
+ * OpenRouter — each included only when its EXPO_PUBLIC_* key is set, with the
+ * optional legacy server proxy appended LAST. Returns an empty list when nothing
+ * is configured, so the router degrades to cache then the on-device SLM. The
+ * ordering itself lives in cloudCascade.buildCloudProviders so generate.ts can
+ * reuse the exact same list.
+ */
 async function getProviders(): Promise<ProviderHandle[]> {
-  const handles: ProviderHandle[] = [];
-
-  for (const id of PROVIDER_CASCADE) {
-    const config = PROVIDERS[id];
-    // eslint-disable-next-line no-await-in-loop
-    const apiKey = await getApiKey(id);
-    if (!apiKey) {
-      continue;
-    }
-
-    handles.push({
-      id,
-      stream: ({ system, user, maxTokens, onToken, signal }) =>
-        streamChatCompletion({
-          baseURL: config.baseURL,
-          apiKey,
-          model: config.model,
-          maxTokens,
-          onToken,
-          signal,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          // OpenRouter recommends attribution headers for free-tier traffic.
-          extraHeaders:
-            id === 'openrouter'
-              ? { 'HTTP-Referer': 'https://suri.app', 'X-Title': 'Suri' }
-              : undefined,
-        }),
-    });
-  }
-
-  return handles;
+  return buildCloudProviders();
 }
 
 const deps: RouteDeps = {
