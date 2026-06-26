@@ -261,10 +261,10 @@ Tier 3 (Offline/No Signal): On-device small language model (SLM) using llama.rn 
 
 Suri was proudly built by:
 
-* **Lorenz Gabriel Velasco**
-* **Eunice Angeline Y. Cruz**
-* **Ardiel Drew L. Cristobal**
-* **Ma. Ellery Brienne B. Santiago**
+* **Lorenz Gabriel Velasco** — Team Lead, Full Stack
+* **Eunice Angeline Y. Cruz** — Frontend
+* **Ma. Ellery Brienne B. Santiago** — Backend
+* **Ardiel Drew L. Cristobal** — Full Stack
 
 ---
 
