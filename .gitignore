@@ -1,5 +1,13 @@
+node_modules/
+.expo/
+dist/
+*.tsbuildinfo
+
 skills-ng-mama-mo/
 study-companion-project-spec.md
 suri-mobile-project-spec.md
 frontendgui.md
 suri-mobile-project-spec-v2.md
+.agent
+expo-env.d.ts
+suri-mobile-project-spec-v3.md
