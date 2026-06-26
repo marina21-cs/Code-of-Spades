@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/yourusername/suri/main/assets/suri-logo.png" alt="Suri Fox Mascot" width="120" />
+<img src="./assets/suri-logo.png" alt="Suri Fox Mascot" width="120" />
 
 # 🦊 Suri
 
-### *Matalinong kasama sa pag-aaral, kahit walang internet.*
+### *May tanong ka? Suriin natin.*
 **Offline-first AI Study Companion for Filipino Learners**
 
 <br/>
